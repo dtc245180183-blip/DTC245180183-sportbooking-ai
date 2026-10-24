@@ -10,7 +10,9 @@
     "**/.pytest_cache": true,
     "**/node_modules": true,
     "**/venv": true,
-    "**/dist": true
+    "**/dist": true,
+    "**/.vscode": true,
+    "**/.dockerignore": true
   },
   "python.analysis.extraPaths": [
     "./backend"

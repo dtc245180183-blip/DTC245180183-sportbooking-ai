@@ -104,23 +104,26 @@ DTC245180183-sportbooking-ai/
 │   ├── tests/                  # Bộ kiểm thử tự động toàn diện Pytest
 │   ├── sport_court.db          # Cơ sở dữ liệu mẫu đang chạy (12 đơn, thực thu 1,750,000đ)
 │   ├── requirements.txt        # Danh mục thư viện Python phụ thuộc
+│   ├── pytest.ini              # Cấu hình kiểm thử Pytest
+│   ├── .env                    # Biến môi trường bảo mật cục bộ
 │   └── Dockerfile              # Dockerfile tối ưu cho Python FastAPI
 ├── database/                   # Định nghĩa & Dữ liệu CSDL chuẩn hóa cấp gốc
 │   ├── schema.sql              # Toàn bộ câu lệnh DDL khởi tạo 9 bảng và chỉ mục
 │   ├── seed_data.sql           # Dữ liệu hạt giống chuẩn hóa (DML) 12 đơn & 10 giao dịch
 │   └── README.md               # Đặc tả chi tiết CSDL, ERD và bảng đối soát 1,750,000đ
 ├── docs/                       # Thư viện toàn bộ tài liệu nghiên cứu & báo cáo học phần
-│   ├── WORKFLOW.md             # Quy trình phát triển phần mềm theo các mốc SDLC (KT1-KT3)
-│   ├── project_documents.md    # Tài liệu phân tích yêu cầu & thiết kế hệ thống gốc
-│   ├── use_cases.md            # Đặc tả chi tiết 12 Ca sử dụng kèm kịch bản luồng sự kiện
+│   ├── bao-cao-cuoi-ky.md      # Đề cương báo cáo đồ án kết thúc học phần
 │   ├── database_design.md      # Thiết kế chi tiết cơ sở dữ liệu & quan hệ thực thể
-│   ├── requirements.md         # Đặc tả yêu cầu phần mềm chi tiết (SRS)
-│   ├── code_review_ai.md       # Báo cáo đánh giá chất lượng mã nguồn từ AI
-│   ├── prompt_experiment_results.md # Báo cáo thực nghiệm tối ưu hóa Prompt Gemini
-│   ├── ai_log.md               # Nhật ký kỹ thuật tích hợp AI, cấu hình fallback & latency
-│   ├── system_design_prompts.md# Bộ prompts thiết kế kiến trúc hệ thống
-│   ├── UI-UX-DESIGN.md         # Tài liệu phân tích và thiết kế giao diện Glassmorphism
-│   └── bao-cao-cuoi-ky.md      # Đề cương báo cáo đồ án kết thúc học phần
+│   ├── use_cases.md            # Đặc tả chi tiết 12 Ca sử dụng kèm kịch bản luồng sự kiện
+│   └── references/             # Thư mục phụ lục tài liệu chuyên đề & thực nghiệm
+│       ├── WORKFLOW.md         # Quy trình phát triển phần mềm theo các mốc SDLC (KT1-KT3)
+│       ├── project_documents.md# Bản phân tích yêu cầu & thiết kế hệ thống gốc
+│       ├── requirements.md     # Đặc tả yêu cầu phần mềm chi tiết (SRS)
+│       ├── code_review_ai.md   # Báo cáo đánh giá chất lượng mã nguồn từ AI
+│       ├── prompt_experiment_results.md # Báo cáo thực nghiệm tối ưu hóa Prompt Gemini
+│       ├── ai_log.md           # Nhật ký kỹ thuật tích hợp AI, cấu hình fallback & latency
+│       ├── system_design_prompts.md # Bộ prompts thiết kế kiến trúc hệ thống
+│       └── UI-UX-DESIGN.md     # Tài liệu phân tích và thiết kế giao diện Glassmorphism
 ├── frontend/                   # Mã nguồn Giao diện Người dùng (React 18 + Vite 5 SPA)
 │   ├── src/                    # Components, Pages, Contexts, APIs
 │   ├── nginx.conf              # Cấu hình Reverse Proxy Nginx điều hướng API & SPA routing
@@ -141,14 +144,14 @@ DTC245180183-sportbooking-ai/
 Toàn bộ hệ thống Backend, Frontend và Cơ sở dữ liệu mẫu đã được cấu hình trọn gói trong Docker Compose. Giảng viên và người đánh giá có thể chạy dự án ngay lập tức bằng các bước sau:
 
 #### Bước 1: Sao chép tệp cấu hình môi trường
-Từ thư mục gốc của dự án, tạo file `.env` cho backend từ file mẫu:
+Từ thư mục gốc của dự án, tạo file `.env` cho backend từ file mẫu `.env.example`:
 - **Trên Windows (PowerShell / Command Prompt):**
   ```powershell
-  copy backend\.env.example backend\.env
+  copy .env.example backend\.env
   ```
 - **Trên Linux / macOS:**
   ```bash
-  cp backend/.env.example backend/.env
+  cp .env.example backend/.env
   ```
 
 #### Bước 2: Xây dựng và khởi chạy các Container
@@ -176,8 +179,9 @@ Nếu muốn khởi chạy và gỡ lỗi (debug) từng thành phần trong mô
    python -m venv venv
    .\venv\Scripts\activate   # Trên Linux/Mac: source venv/bin/activate
    pip install -r requirements.txt
-   copy .env.example .env     # Trên Linux/Mac: cp .env.example .env
+   copy ..\.env.example .env  # Trên Linux/Mac: cp ../.env.example .env
    uvicorn app.main:app --reload --port 8000
+   ```
    ```
    *Máy chủ API sẽ hoạt động tại: `http://localhost:8000`*
 
@@ -414,20 +418,23 @@ Hệ thống cung cấp đầy đủ các điểm cuối API theo chuẩn RESTfu
 
 ### 6.5. Danh Mục Liên Kết Nhanh Tới Toàn Bộ Tài Liệu Báo Cáo Trong Thư Mục `docs/`
 
-Toàn bộ các tài liệu chuyên đề, thiết kế kỹ thuật và báo cáo học thuật được lưu trữ đầy đủ trong thư mục [docs/](file:///c:/Users/HP/OneDrive/Desktop/DỰ%20ÁN%20NHÓM%2014/docs):
+Toàn bộ các tài liệu chuyên đề, thiết kế kỹ thuật và báo cáo học thuật được lưu trữ khoa học trong thư mục [docs/](file:///c:/Users/HP/OneDrive/Desktop/DỰ%20ÁN%20NHÓM%2014/docs):
 
-1. 📋 [WORKFLOW.md](file:///c:/Users/HP/OneDrive/Desktop/DỰ%20ÁN%20NHÓM%2014/docs/WORKFLOW.md): Quy trình phát triển phần mềm chi tiết qua các giai đoạn SDLC (Kiểm tra 1 → Kiểm tra 2 → Kiểm tra 3 → Nghiệm thu Cuối kỳ).
-2. 📄 [project_documents.md](file:///c:/Users/HP/OneDrive/Desktop/DỰ%20ÁN%20NHÓM%2014/docs/project_documents.md): Bản phân tích đặc tả yêu cầu, thiết kế CSDL thực thể và các ca sử dụng nền tảng.
-3. 🎯 [use_cases.md](file:///c:/Users/HP/OneDrive/Desktop/DỰ%20ÁN%20NHÓM%2014/docs/use_cases.md): Đặc tả chi tiết 12 Ca sử dụng (Use Cases) kèm kịch bản luồng sự kiện chính, luồng phụ và ngoại lệ.
-4. 🗄️ [database_design.md](file:///c:/Users/HP/OneDrive/Desktop/DỰ%20ÁN%20NHÓM%2014/docs/database_design.md): Tài liệu thiết kế chi tiết cơ sở dữ liệu, từ điển dữ liệu (Data Dictionary) và ràng buộc toàn vẹn.
-5. 📊 [database/README.md](file:///c:/Users/HP/OneDrive/Desktop/DỰ%20ÁN%20NHÓM%2014/database/README.md): Hướng dẫn CSDL cấp gốc, sơ đồ ERD và bảng đối soát chi tiết 12 đơn mẫu thực thu 1,750,000 VNĐ.
-6. 📝 [requirements.md](file:///c:/Users/HP/OneDrive/Desktop/DỰ%20ÁN%20NHÓM%2014/docs/requirements.md): Đặc tả yêu cầu phần mềm chi tiết (SRS - Yêu cầu chức năng & Yêu cầu phi chức năng).
-7. 🤖 [code_review_ai.md](file:///c:/Users/HP/OneDrive/Desktop/DỰ%20ÁN%20NHÓM%2014/docs/code_review_ai.md): Báo cáo đánh giá và thẩm định chất lượng mã nguồn từ Trí tuệ nhân tạo.
-8. 🧪 [prompt_experiment_results.md](file:///c:/Users/HP/OneDrive/Desktop/DỰ%20ÁN%20NHÓM%2014/docs/prompt_experiment_results.md): Báo cáo thực nghiệm so sánh, đo lường và tối ưu hóa Prompt trên mô hình Google Gemini.
-9. 📝 [ai_log.md](file:///c:/Users/HP/OneDrive/Desktop/DỰ%20ÁN%20NHÓM%2014/docs/ai_log.md): Nhật ký kỹ thuật tích hợp AI, cấu hình fallback dự phòng và đo lường độ trễ (latency metrics).
-10. 💡 [system_design_prompts.md](file:///c:/Users/HP/OneDrive/Desktop/DỰ%20ÁN%20NHÓM%2014/docs/system_design_prompts.md): Bộ prompts tiêu chuẩn phục vụ thiết kế kiến trúc hệ thống và luồng giao dịch.
-11. 🎨 [UI-UX-DESIGN.md](file:///c:/Users/HP/OneDrive/Desktop/DỰ%20ÁN%20NHÓM%2014/docs/UI-UX-DESIGN.md): Tài liệu phân tích và thiết kế trải nghiệm người dùng phong cách Glassmorphism & Dark Mode.
-12. 🎓 [bao-cao-cuoi-ky.md](file:///c:/Users/HP/OneDrive/Desktop/DỰ%20ÁN%20NHÓM%2014/docs/bao-cao-cuoi-ky.md): Đề cương và dàn ý tổng hợp phục vụ buổi báo cáo nghiệm thu học phần.
+#### 📌 Tài liệu Báo Cáo Trọng Tâm:
+1. 🎓 [bao-cao-cuoi-ky.md](file:///c:/Users/HP/OneDrive/Desktop/DỰ%20ÁN%20NHÓM%2014/docs/bao-cao-cuoi-ky.md): Đề cương và dàn ý tổng hợp phục vụ buổi báo cáo nghiệm thu học phần.
+2. 🎯 [use_cases.md](file:///c:/Users/HP/OneDrive/Desktop/DỰ%20ÁN%20NHÓM%2014/docs/use_cases.md): Đặc tả chi tiết 12 Ca sử dụng (Use Cases) kèm kịch bản luồng sự kiện chính, luồng phụ và ngoại lệ.
+3. 🗄️ [database_design.md](file:///c:/Users/HP/OneDrive/Desktop/DỰ%20ÁN%20NHÓM%2014/docs/database_design.md): Tài liệu thiết kế chi tiết cơ sở dữ liệu, từ điển dữ liệu (Data Dictionary) và ràng buộc toàn vẹn.
+4. 📊 [database/README.md](file:///c:/Users/HP/OneDrive/Desktop/DỰ%20ÁN%20NHÓM%2014/database/README.md): Hướng dẫn CSDL cấp gốc, sơ đồ ERD và bảng đối soát chi tiết 12 đơn mẫu thực thu 1,750,000 VNĐ.
+
+#### 📁 Tài Liệu Chuyên Đề & Phụ Lục Nghiên Cứu ([docs/references/](file:///c:/Users/HP/OneDrive/Desktop/DỰ%20ÁN%20NHÓM%2014/docs/references)):
+5. 📋 [WORKFLOW.md](file:///c:/Users/HP/OneDrive/Desktop/DỰ%20ÁN%20NHÓM%2014/docs/references/WORKFLOW.md): Quy trình phát triển phần mềm chi tiết qua các giai đoạn SDLC (Kiểm tra 1 → Kiểm tra 2 → Kiểm tra 3 → Nghiệm thu Cuối kỳ).
+6. 📄 [project_documents.md](file:///c:/Users/HP/OneDrive/Desktop/DỰ%20ÁN%20NHÓM%2014/docs/references/project_documents.md): Bản phân tích đặc tả yêu cầu, thiết kế CSDL thực thể và các ca sử dụng nền tảng.
+7. 📝 [requirements.md](file:///c:/Users/HP/OneDrive/Desktop/DỰ%20ÁN%20NHÓM%2014/docs/references/requirements.md): Đặc tả yêu cầu phần mềm chi tiết (SRS - Yêu cầu chức năng & Yêu cầu phi chức năng).
+8. 🤖 [code_review_ai.md](file:///c:/Users/HP/OneDrive/Desktop/DỰ%20ÁN%20NHÓM%2014/docs/references/code_review_ai.md): Báo cáo đánh giá và thẩm định chất lượng mã nguồn từ Trí tuệ nhân tạo.
+9. 🧪 [prompt_experiment_results.md](file:///c:/Users/HP/OneDrive/Desktop/DỰ%20ÁN%20NHÓM%2014/docs/references/prompt_experiment_results.md): Báo cáo thực nghiệm so sánh, đo lường và tối ưu hóa Prompt trên mô hình Google Gemini.
+10. 📝 [ai_log.md](file:///c:/Users/HP/OneDrive/Desktop/DỰ%20ÁN%20NHÓM%2014/docs/references/ai_log.md): Nhật ký kỹ thuật tích hợp AI, cấu hình fallback dự phòng và đo lường độ trễ (latency metrics).
+11. 💡 [system_design_prompts.md](file:///c:/Users/HP/OneDrive/Desktop/DỰ%20ÁN%20NHÓM%2014/docs/references/system_design_prompts.md): Bộ prompts tiêu chuẩn phục vụ thiết kế kiến trúc hệ thống và luồng giao dịch.
+12. 🎨 [UI-UX-DESIGN.md](file:///c:/Users/HP/OneDrive/Desktop/DỰ%20ÁN%20NHÓM%2014/docs/references/UI-UX-DESIGN.md): Tài liệu phân tích và thiết kế trải nghiệm người dùng phong cách Glassmorphism & Dark Mode.
 
 ---
 
