@@ -1,0 +1,720 @@
+/* =====================================================
+   SCHEDULE PAGE — Modern Enterprise UI Design
+   ===================================================== */
+.schedule-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding-bottom: 2rem;
+}
+
+.schedule-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.schedule-header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+/* =====================================================
+   TOOLBAR — Modern Floating Card
+   ===================================================== */
+.schedule-toolbar {
+  background: #FFFFFF;
+  border-radius: 16px;
+  padding: 0.85rem 1.25rem;
+  border: 1px solid #E2E8F0;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.date-nav-group {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  padding: 3px;
+}
+
+.date-nav-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: #475569;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.date-nav-btn:hover {
+  background: #FFFFFF;
+  color: #0F172A;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.date-picker-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.25rem 0.65rem;
+  background: #FFFFFF;
+  border-radius: 8px;
+  border: 1px solid #CBD5E1;
+}
+
+.date-picker-icon {
+  color: #64748B;
+  flex-shrink: 0;
+}
+
+.date-input {
+  border: none;
+  outline: none;
+  font-family: inherit;
+  font-size: 0.875rem;
+  background: transparent;
+  color: #0F172A;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-today {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: #FFFFFF;
+  border: 1px solid #CBD5E1;
+  color: #334155;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.45rem 0.85rem;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-today:hover {
+  background: #F8FAFC;
+  border-color: #94A3B8;
+  color: #0F172A;
+}
+
+.btn-today.is-today-active {
+  background: #EFF6FF;
+  border-color: #93C5FD;
+  color: #1D4ED8;
+}
+
+.date-display-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #1E293B;
+  background: #F1F5F9;
+  border: 1px solid #E2E8F0;
+  padding: 0.4rem 0.85rem;
+  border-radius: 10px;
+}
+
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.btn-toolbar-outline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #FFFFFF;
+  border: 1px solid #CBD5E1;
+  color: #334155;
+  font-size: 0.875rem;
+  font-weight: 600;
+  padding: 0.5rem 1rem;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-toolbar-outline:hover {
+  background: #F8FAFC;
+  border-color: #94A3B8;
+  color: #0F172A;
+}
+
+/* NÚT AI NỔI BẬT VỚI HIỆU ỨNG GRADIENT TÍM/XANH NGỌC SANG TRỌNG */
+.btn-toolbar-ai {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: linear-gradient(135deg, #7C3AED 0%, #6366F1 50%, #06B6D4 100%);
+  color: #FFFFFF;
+  font-size: 0.875rem;
+  font-weight: 700;
+  padding: 0.55rem 1.2rem;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.35);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  letter-spacing: 0.01em;
+}
+
+.btn-toolbar-ai:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(124, 58, 237, 0.45);
+  filter: brightness(1.06);
+}
+
+.btn-toolbar-ai:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(124, 58, 237, 0.3);
+}
+
+.ai-sparkle-icon {
+  animation: pulseRotate 3s infinite ease-in-out;
+}
+
+@keyframes pulseRotate {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  50% { transform: scale(1.15) rotate(10deg); }
+}
+
+/* =====================================================
+   LEGEND BAR (CHÚ THÍCH TRẠNG THÁI NHANH)
+   ===================================================== */
+.schedule-legend-bar {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.85rem;
+  padding: 0 0.25rem;
+  font-size: 0.78rem;
+  color: #64748B;
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.legend-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.legend-dot.available { background: #10B981; }
+.legend-dot.booked { background: #059669; }
+.legend-dot.blocked { background: #94A3B8; }
+.legend-dot.maintenance { background: #CBD5E1; }
+.legend-dot.peak { background: #F59E0B; }
+
+/* =====================================================
+   CALENDAR GRID CONTAINER
+   ===================================================== */
+.calendar-container {
+  flex: 1;
+  background: #FFFFFF;
+  border-radius: 16px;
+  border: 1px solid #E2E8F0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.calendar-scroll-area {
+  flex: 1;
+  overflow: auto;
+  position: relative;
+}
+
+.calendar-grid {
+  display: grid;
+  min-width: 100%;
+}
+
+.calendar-header-row {
+  display: grid;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #FFFFFF;
+  border-bottom: 2px solid #E2E8F0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+}
+
+.calendar-corner-label {
+  padding: 0.75rem 0.5rem;
+  border-right: 1px solid #E2E8F0;
+  background: #F8FAFC;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #94A3B8;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+/* =====================================================
+   COURT HEADER CARD
+   ===================================================== */
+.calendar-court-header-card {
+  padding: 0.75rem 0.65rem;
+  border-right: 1px solid #E2E8F0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.45rem;
+  background: #FFFFFF;
+  position: relative;
+  transition: background 0.15s ease;
+  border-top: 3px solid var(--court-accent, #10B981);
+}
+
+.calendar-court-header-card:hover {
+  background: #FAFAFA;
+}
+
+.calendar-court-header-card.in-maintenance {
+  background: #FDFEFE;
+}
+
+.court-card-top {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: 100%;
+  justify-content: center;
+}
+
+.court-icon-wrapper {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 1px solid;
+}
+
+.court-sport-img {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+}
+
+.court-card-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+  text-align: left;
+}
+
+.court-name-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.court-name {
+  font-weight: 700;
+  font-size: 0.875rem;
+  color: #0F172A;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 130px;
+}
+
+.court-type-subtitle {
+  font-size: 0.72rem;
+  color: #64748B;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 130px;
+}
+
+.court-maintenance-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  background: #FEF3C7;
+  color: #B45309;
+  border: 1px solid #FDE68A;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.court-card-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.court-price-pill {
+  background: #F0FDF4;
+  color: #15803D;
+  border: 1px solid #BBF7D0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  white-space: nowrap;
+}
+
+/* =====================================================
+   TIME AXIS & BODY ROWS
+   ===================================================== */
+.calendar-body-row {
+  display: grid;
+  border-bottom: 1px solid #F1F5F9;
+}
+
+.calendar-time-label {
+  padding: 0.5rem 0.35rem;
+  border-right: 1px solid #E2E8F0;
+  background: #F8FAFC;
+  position: sticky;
+  left: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15rem;
+  min-height: 74px;
+}
+
+.calendar-time-label .time-text {
+  font-weight: 700;
+  color: #334155;
+  font-size: 0.82rem;
+  letter-spacing: -0.01em;
+}
+
+.calendar-time-label.peak-hour {
+  background: #FFFBEB;
+  border-left: 3.5px solid #F59E0B;
+}
+
+.calendar-time-label.peak-hour .time-text {
+  color: #B45309;
+}
+
+.peak-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  background: #FEF3C7;
+  color: #D97706;
+  border: 1px solid #FDE68A;
+  font-size: 0.6rem;
+  font-weight: 700;
+  padding: 1px 4px;
+  border-radius: 4px;
+  line-height: 1;
+}
+
+/* =====================================================
+   SLOT CELLS & INTERACTIVE STATES
+   ===================================================== */
+.slot-cell {
+  border-right: 1px solid #F1F5F9;
+  padding: 0.35rem;
+  min-height: 74px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  position: relative;
+  transition: all 0.15s ease;
+  background-color: #FFFFFF;
+}
+
+/* Ô TRỐNG (AVAILABLE) */
+.slot-cell.available {
+  background-color: #FFFFFF;
+  cursor: pointer;
+}
+
+.slot-available-idle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 100%;
+  height: 100%;
+  transition: opacity 0.15s ease;
+}
+
+.slot-available-badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #059669;
+  background: #ECFDF5;
+  border: 1px solid #A7F3D0;
+  padding: 1px 8px;
+  border-radius: 9999px;
+}
+
+.slot-available-price {
+  font-size: 0.68rem;
+  color: #94A3B8;
+  font-weight: 500;
+}
+
+.slot-available-hover {
+  display: none;
+}
+
+/* HOVER VÀO Ô TRỐNG: NỀN XANH NGỌC PASTEL #ECFDF5, VIỀN XANH #10B981, HIỆN NÚT ĐẶT SÂN */
+.slot-cell.available:hover {
+  background-color: #ECFDF5 !important;
+  border: 1.5px solid #10B981 !important;
+  box-shadow: inset 0 0 0 1px #10B981, 0 2px 6px rgba(16, 185, 129, 0.12);
+  z-index: 2;
+  border-radius: 6px;
+}
+
+.slot-cell.available:hover .slot-available-idle {
+  display: none;
+}
+
+.slot-cell.available:hover .slot-available-hover {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  color: #059669;
+  font-weight: 700;
+  font-size: 0.8rem;
+  background: #D1FAE5;
+  border-radius: 6px;
+  padding: 0.4rem 0.6rem;
+  width: 100%;
+  height: 100%;
+  animation: fadeInScale 0.15s ease;
+}
+
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Ô ĐÃ ĐẶT (BOOKED): NỀN XANH ĐẬM / XANH NGỌC #059669, CHỮ TRẮNG, TOOLTIP CHI TIẾT */
+.slot-cell.booked {
+  padding: 0.3rem;
+  cursor: pointer;
+  background-color: #FFFFFF;
+}
+
+.slot-booked-card {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  color: #FFFFFF;
+  border-radius: 8px;
+  padding: 0.45rem 0.55rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 100%;
+  min-height: 66px;
+  box-shadow: 0 2px 4px rgba(5, 150, 105, 0.2);
+  transition: all 0.15s ease;
+}
+
+.slot-cell.booked:hover .slot-booked-card {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(5, 150, 105, 0.35);
+  filter: brightness(1.04);
+}
+
+.slot-booked-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+.slot-booked-code {
+  font-size: 0.72rem;
+  font-weight: 800;
+  background: rgba(255, 255, 255, 0.22);
+  padding: 1px 5px;
+  border-radius: 4px;
+  letter-spacing: 0.02em;
+}
+
+.slot-booked-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #A7F3D0;
+  box-shadow: 0 0 6px #A7F3D0;
+}
+
+.slot-booked-customer {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-weight: 700;
+  font-size: 0.82rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+
+.slot-booked-icon {
+  flex-shrink: 0;
+  opacity: 0.9;
+}
+
+.slot-customer-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.slot-booked-sub {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.65rem;
+  opacity: 0.9;
+  font-weight: 500;
+}
+
+.slot-deposit-tag {
+  color: #FEF08A;
+  font-weight: 600;
+}
+
+/* Ô BẢO TRÌ / KHÓA (MAINTENANCE): NỀN XÁM SỌC NHẸ, CHỮ XÁM, VÔ HIỆU HÓA CLICK */
+.slot-cell.maintenance {
+  background: repeating-linear-gradient(45deg, #F8FAFC, #F8FAFC 8px, #F1F5F9 8px, #F1F5F9 16px);
+  border-right: 1px solid #E2E8F0;
+  cursor: not-allowed;
+  opacity: 0.85;
+}
+
+.slot-cell.maintenance:hover {
+  background: repeating-linear-gradient(45deg, #F1F5F9, #F1F5F9 8px, #E2E8F0 8px, #E2E8F0 16px);
+}
+
+.slot-maintenance-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  color: #64748B;
+  font-size: 0.72rem;
+  font-weight: 600;
+  height: 100%;
+}
+
+.maintenance-icon {
+  color: #94A3B8;
+}
+
+/* Ô ĐÃ KHÓA THỦ CÔNG (BLOCKED) */
+.slot-cell.blocked {
+  background-color: #F8FAFC;
+  border-right: 1px solid #F1F5F9;
+  cursor: pointer;
+}
+
+.slot-blocked-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  height: 100%;
+}
+
+.slot-blocked-text {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #64748B;
+  background: #F1F5F9;
+  border: 1px solid #E2E8F0;
+  padding: 1px 8px;
+  border-radius: 9999px;
+}
+
+/* Ô CHƯA CÓ DỮ LIỆU (MISSING) */
+.slot-cell.missing {
+  background-color: #FAFAFA;
+  border-right: 1px solid #F1F5F9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #CBD5E1;
+  font-size: 0.85rem;
+}
+
+.slot-missing-content {
+  opacity: 0.4;
+}
+
+/* =====================================================
+   RESPONSIVE DESIGN
+   ===================================================== */
+@media (max-width: 768px) {
+  .schedule-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .toolbar-left, .toolbar-right {
+    justify-content: space-between;
+    width: 100%;
+  }
+}

@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 225" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="400" y2="225" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0a1628"/><stop offset="100%" stop-color="#1a0a1a"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="200" y1="0" x2="200" y2="225" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.15"/><stop offset="100%" stop-color="#f59e0b" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="225" fill="url(#bg)"/>
+  <rect width="400" height="225" fill="url(#glow)"/>
+  <!-- Court -->
+  <rect x="35" y="38" width="330" height="152" rx="4" fill="none" stroke="#f59e0b" stroke-width="2.5"/>
+  <!-- Attack lines (3m) -->
+  <line x1="35" y1="92" x2="365" y2="92" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="5,4" opacity="0.7"/>
+  <line x1="35" y1="133" x2="365" y2="133" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="5,4" opacity="0.7"/>
+  <!-- Center line -->
+  <line x1="200" y1="38" x2="200" y2="190" stroke="#f59e0b" stroke-width="1.5"/>
+  <!-- Service zones -->
+  <line x1="35" y1="114" x2="365" y2="114" stroke="#f59e0b" stroke-width="2"/>
+  <!-- Net -->
+  <line x1="35" y1="114" x2="365" y2="114" stroke="#e2e8f0" stroke-width="2.5"/>
+  <line x1="35" y1="110" x2="365" y2="110" stroke="#f59e0b" stroke-width="1.5"/>
+  <line x1="35" y1="118" x2="365" y2="118" stroke="#f59e0b" stroke-width="1.5"/>
+  <!-- Net mesh vertical lines -->
+  <line x1="68" y1="108" x2="68" y2="120" stroke="#f59e0b" stroke-width="0.8" opacity="0.5"/>
+  <line x1="101" y1="108" x2="101" y2="120" stroke="#f59e0b" stroke-width="0.8" opacity="0.5"/>
+  <line x1="134" y1="108" x2="134" y2="120" stroke="#f59e0b" stroke-width="0.8" opacity="0.5"/>
+  <line x1="167" y1="108" x2="167" y2="120" stroke="#f59e0b" stroke-width="0.8" opacity="0.5"/>
+  <line x1="200" y1="108" x2="200" y2="120" stroke="#f59e0b" stroke-width="0.8" opacity="0.5"/>
+  <line x1="233" y1="108" x2="233" y2="120" stroke="#f59e0b" stroke-width="0.8" opacity="0.5"/>
+  <line x1="266" y1="108" x2="266" y2="120" stroke="#f59e0b" stroke-width="0.8" opacity="0.5"/>
+  <line x1="299" y1="108" x2="299" y2="120" stroke="#f59e0b" stroke-width="0.8" opacity="0.5"/>
+  <line x1="332" y1="108" x2="332" y2="120" stroke="#f59e0b" stroke-width="0.8" opacity="0.5"/>
+  <!-- Ball -->
+  <circle cx="115" cy="70" r="12" fill="#f8fafc" opacity="0.9"/>
+  <path d="M103 70 Q115 62 127 70" stroke="#f59e0b" stroke-width="1.5" fill="none"/>
+  <path d="M103 70 Q115 78 127 70" stroke="#f59e0b" stroke-width="1.5" fill="none"/>
+  <line x1="103" y1="70" x2="127" y2="70" stroke="#f59e0b" stroke-width="1" opacity="0.5"/>
+  <!-- Label -->
+  <rect x="144" y="196" width="112" height="22" rx="11" fill="rgba(245,158,11,0.15)" stroke="rgba(245,158,11,0.3)" stroke-width="1"/>
+  <text x="200" y="211" text-anchor="middle" fill="#f59e0b" font-family="system-ui,sans-serif" font-size="11" font-weight="600">Sân Bóng Chuyền</text>
+</svg>

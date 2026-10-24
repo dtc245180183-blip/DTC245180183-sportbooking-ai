@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 225" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="400" y2="225" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0a1628"/><stop offset="100%" stop-color="#0a1a2e"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="200" y1="0" x2="200" y2="225" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#14b8a6" stop-opacity="0.18"/><stop offset="100%" stop-color="#14b8a6" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="225" fill="url(#bg)"/>
+  <rect width="400" height="225" fill="url(#glow)"/>
+  <!-- Court -->
+  <rect x="50" y="38" width="300" height="152" rx="4" fill="none" stroke="#14b8a6" stroke-width="2.5"/>
+  <!-- Center line -->
+  <line x1="200" y1="38" x2="200" y2="190" stroke="#14b8a6" stroke-width="1.5"/>
+  <!-- Service boxes -->
+  <line x1="50" y1="114" x2="350" y2="114" stroke="#14b8a6" stroke-width="2" stroke-dasharray="4,3"/>
+  <!-- Short service line -->
+  <line x1="50" y1="78" x2="350" y2="78" stroke="#14b8a6" stroke-width="1" stroke-dasharray="3,3" opacity="0.6"/>
+  <line x1="50" y1="150" x2="350" y2="150" stroke="#14b8a6" stroke-width="1" stroke-dasharray="3,3" opacity="0.6"/>
+  <!-- Net posts -->
+  <line x1="200" y1="95" x2="200" y2="133" stroke="#e2e8f0" stroke-width="2.5"/>
+  <!-- Net -->
+  <line x1="50" y1="114" x2="350" y2="114" stroke="#e2e8f0" stroke-width="2.5"/>
+  <line x1="50" y1="112" x2="350" y2="112" stroke="#14b8a6" stroke-width="1"/>
+  <!-- Shuttlecock -->
+  <circle cx="150" cy="72" r="7" fill="#f8fafc" opacity="0.9"/>
+  <path d="M150 65 L143 55 M150 65 L148 53 M150 65 L155 54 M150 65 L158 57" stroke="#14b8a6" stroke-width="1.5" stroke-linecap="round"/>
+  <!-- Racket shape simplified -->
+  <ellipse cx="270" cy="155" rx="18" ry="22" fill="none" stroke="#14b8a6" stroke-width="2"/>
+  <line x1="262" y1="167" x2="270" y2="177" stroke="#14b8a6" stroke-width="3" stroke-linecap="round"/>
+  <line x1="270" y1="177" x2="278" y2="187" stroke="#14b8a6" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- Grid lines on racket -->
+  <line x1="258" y1="150" x2="282" y2="150" stroke="#14b8a6" stroke-width="0.7" opacity="0.5"/>
+  <line x1="256" y1="157" x2="284" y2="157" stroke="#14b8a6" stroke-width="0.7" opacity="0.5"/>
+  <line x1="258" y1="143" x2="282" y2="143" stroke="#14b8a6" stroke-width="0.7" opacity="0.5"/>
+  <line x1="265" y1="133" x2="265" y2="167" stroke="#14b8a6" stroke-width="0.7" opacity="0.5"/>
+  <line x1="270" y1="133" x2="270" y2="167" stroke="#14b8a6" stroke-width="0.7" opacity="0.5"/>
+  <line x1="275" y1="133" x2="275" y2="167" stroke="#14b8a6" stroke-width="0.7" opacity="0.5"/>
+  <!-- Label -->
+  <rect x="148" y="196" width="104" height="22" rx="11" fill="rgba(20,184,166,0.15)" stroke="rgba(20,184,166,0.3)" stroke-width="1"/>
+  <text x="200" y="211" text-anchor="middle" fill="#14b8a6" font-family="system-ui,sans-serif" font-size="11" font-weight="600">Sân Cầu Lông</text>
+</svg>

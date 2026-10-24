@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 225" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="400" y2="225" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0a1628"/><stop offset="100%" stop-color="#1a0e00"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="200" y1="0" x2="200" y2="225" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#f97316" stop-opacity="0.15"/><stop offset="100%" stop-color="#f97316" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="225" fill="url(#bg)"/>
+  <rect width="400" height="225" fill="url(#glow)"/>
+  <!-- Basketball court half -->
+  <rect x="30" y="35" width="340" height="155" rx="4" fill="none" stroke="#f97316" stroke-width="2.5"/>
+  <!-- Free throw lane (paint) -->
+  <rect x="30" y="78" width="90" height="69" fill="rgba(249,115,22,0.08)" stroke="#f97316" stroke-width="1.5"/>
+  <rect x="280" y="78" width="90" height="69" fill="rgba(249,115,22,0.08)" stroke="#f97316" stroke-width="1.5"/>
+  <!-- Free throw circle -->
+  <path d="M30 112 Q75 80 120 112" stroke="#f97316" stroke-width="1.5" fill="none" stroke-dasharray="4,3"/>
+  <path d="M280 112 Q325 80 370 112" stroke="#f97316" stroke-width="1.5" fill="none" stroke-dasharray="4,3"/>
+  <!-- Basket / hoop -->
+  <rect x="18" y="103" width="15" height="3" rx="1.5" fill="#f97316" opacity="0.7"/>
+  <ellipse cx="38" cy="112" rx="12" ry="12" fill="none" stroke="#f97316" stroke-width="2"/>
+  <rect x="367" y="103" width="15" height="3" rx="1.5" fill="#f97316" opacity="0.7"/>
+  <ellipse cx="362" cy="112" rx="12" ry="12" fill="none" stroke="#f97316" stroke-width="2"/>
+  <!-- Center circle -->
+  <circle cx="200" cy="112" r="30" fill="none" stroke="#f97316" stroke-width="1.5"/>
+  <!-- Center line -->
+  <line x1="200" y1="35" x2="200" y2="190" stroke="#f97316" stroke-width="1.5"/>
+  <!-- Three-point arc (simplified) -->
+  <path d="M30 68 Q100 35 170 58" stroke="#f97316" stroke-width="1.5" fill="none" stroke-dasharray="5,3" opacity="0.7"/>
+  <path d="M30 156 Q100 190 170 167" stroke="#f97316" stroke-width="1.5" fill="none" stroke-dasharray="5,3" opacity="0.7"/>
+  <path d="M230 58 Q300 35 370 68" stroke="#f97316" stroke-width="1.5" fill="none" stroke-dasharray="5,3" opacity="0.7"/>
+  <path d="M230 167 Q300 190 370 156" stroke="#f97316" stroke-width="1.5" fill="none" stroke-dasharray="5,3" opacity="0.7"/>
+  <!-- Ball -->
+  <circle cx="200" cy="90" r="16" fill="#f97316" opacity="0.85"/>
+  <path d="M184 90 Q192 82 200 90 Q208 98 216 90" stroke="#1e1408" stroke-width="1.5" fill="none" opacity="0.6"/>
+  <line x1="200" y1="74" x2="200" y2="106" stroke="#1e1408" stroke-width="1.5" opacity="0.6"/>
+  <!-- Label -->
+  <rect x="140" y="196" width="120" height="22" rx="11" fill="rgba(249,115,22,0.15)" stroke="rgba(249,115,22,0.3)" stroke-width="1"/>
+  <text x="200" y="211" text-anchor="middle" fill="#f97316" font-family="system-ui,sans-serif" font-size="11" font-weight="600">Sân Bóng Rổ</text>
+</svg>

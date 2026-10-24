@@ -1,0 +1,95 @@
+/* =====================================================
+   USERS PAGE - Modern Enterprise Light Mode
+   ===================================================== */
+
+.users-page {
+  max-width: 1200px;
+}
+
+.users-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.user-stat-card {
+  padding: 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.user-stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.user-stat-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.user-stat-info p {
+  font-size: 0.78rem;
+  color: #64748B;
+  margin-bottom: 0.2rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.user-stat-info strong {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #0F172A;
+  line-height: 1;
+}
+
+.role-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 3px 10px;
+  border-radius: 99px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.role-admin {
+  background: #FAF5FF;
+  color: #7E22CE;
+  border: 1px solid #E9D5FF;
+}
+
+.role-staff {
+  background: #EFF6FF;
+  color: #1D4ED8;
+  border: 1px solid #BFDBFE;
+}
+
+.user-avatar-sm {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+  color: #0F172A;
+  background: #F1F5F9;
+  border: 1px solid #E2E8F0;
+}

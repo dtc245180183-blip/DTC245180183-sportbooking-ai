@@ -1,0 +1,117 @@
+/* =====================================================
+   TOPBAR — Modern Enterprise SaaS Light Mode
+   ===================================================== */
+.topbar {
+  height: 62px;
+  background: #FFFFFF;
+  border-bottom: 1px solid #F1F5F9;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1.75rem;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.02);
+}
+
+/* Left section */
+.topbar-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.topbar-page-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #0F172A;
+  letter-spacing: -0.015em;
+}
+
+.topbar-date {
+  font-size: 0.75rem;
+  color: #64748B;
+  text-transform: capitalize;
+}
+
+/* Right section */
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.topbar-greeting {
+  padding: 5px 12px;
+  background: #F0FDF4;
+  border: 1px solid #DCFCE7;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  color: #15803D;
+  font-weight: 500;
+}
+
+.topbar-greeting strong {
+  color: #059669;
+}
+
+.topbar-icon-btn {
+  width: 36px;
+  height: 36px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #64748B;
+  transition: all 0.18s ease;
+  position: relative;
+}
+
+.topbar-icon-btn:hover {
+  color: #0F172A;
+  border-color: #CBD5E1;
+  background: #F8FAFC;
+}
+
+/* Notification dot */
+.notif-dot {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 7px;
+  height: 7px;
+  background: #10B981;
+  border-radius: 50%;
+  border: 2px solid #FFFFFF;
+  animation: pulse-notif 2s infinite;
+}
+
+@keyframes pulse-notif {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50%       { transform: scale(1.3); opacity: 0.7; }
+}
+
+.topbar-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: #fff;
+  cursor: pointer;
+  border: 1px solid #E2E8F0;
+  transition: all 0.18s ease;
+}
+
+.topbar-avatar:hover {
+  transform: scale(1.05);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}

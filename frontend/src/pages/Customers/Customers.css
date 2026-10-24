@@ -1,0 +1,9 @@
+/* =====================================================
+   CUSTOMERS PAGE
+   ===================================================== */
+
+.customers-page { max-width: 1200px; }
+
+/* Các style chung như form-grid, empty-state, table-container 
+   đã được đưa vào index.css để dùng chung.
+   Nếu cần custom đặc thù cho Customers thì thêm ở đây. */

@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 225" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="400" y2="225" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0a1628"/><stop offset="100%" stop-color="#0d1f35"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="200" y1="0" x2="200" y2="225" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.15"/><stop offset="100%" stop-color="#3b82f6" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="225" fill="url(#bg)"/>
+  <rect width="400" height="225" fill="url(#glow)"/>
+  <!-- Pickleball court (kitchen = NVZ) -->
+  <rect x="55" y="35" width="290" height="155" rx="4" fill="none" stroke="#3b82f6" stroke-width="2.5"/>
+  <!-- Center line full -->
+  <line x1="200" y1="35" x2="200" y2="190" stroke="#3b82f6" stroke-width="1.5"/>
+  <!-- Kitchen lines (7 ft from net) -->
+  <line x1="55" y1="97" x2="345" y2="97" stroke="#3b82f6" stroke-width="2" stroke-dasharray="5,3"/>
+  <line x1="55" y1="128" x2="345" y2="128" stroke="#3b82f6" stroke-width="2" stroke-dasharray="5,3"/>
+  <!-- Kitchen fill (NVZ) -->
+  <rect x="55" y="97" width="290" height="31" fill="rgba(59,130,246,0.06)"/>
+  <!-- Net -->
+  <line x1="55" y1="112" x2="345" y2="112" stroke="#e2e8f0" stroke-width="2.5"/>
+  <line x1="55" y1="110" x2="345" y2="110" stroke="#3b82f6" stroke-width="1.2"/>
+  <line x1="55" y1="114" x2="345" y2="114" stroke="#3b82f6" stroke-width="1.2"/>
+  <!-- Net verticals -->
+  <line x1="82" y1="108" x2="82" y2="116" stroke="#3b82f6" stroke-width="0.8" opacity="0.5"/>
+  <line x1="112" y1="108" x2="112" y2="116" stroke="#3b82f6" stroke-width="0.8" opacity="0.5"/>
+  <line x1="142" y1="108" x2="142" y2="116" stroke="#3b82f6" stroke-width="0.8" opacity="0.5"/>
+  <line x1="172" y1="108" x2="172" y2="116" stroke="#3b82f6" stroke-width="0.8" opacity="0.5"/>
+  <line x1="228" y1="108" x2="228" y2="116" stroke="#3b82f6" stroke-width="0.8" opacity="0.5"/>
+  <line x1="258" y1="108" x2="258" y2="116" stroke="#3b82f6" stroke-width="0.8" opacity="0.5"/>
+  <line x1="288" y1="108" x2="288" y2="116" stroke="#3b82f6" stroke-width="0.8" opacity="0.5"/>
+  <line x1="318" y1="108" x2="318" y2="116" stroke="#3b82f6" stroke-width="0.8" opacity="0.5"/>
+  <!-- Wiffle ball -->
+  <circle cx="130" cy="72" r="11" fill="none" stroke="#f8fafc" stroke-width="2" opacity="0.9"/>
+  <circle cx="125" cy="68" r="2" fill="#f8fafc" opacity="0.7"/>
+  <circle cx="135" cy="68" r="2" fill="#f8fafc" opacity="0.7"/>
+  <circle cx="130" cy="76" r="2" fill="#f8fafc" opacity="0.7"/>
+  <!-- Paddle (simplified) -->
+  <ellipse cx="290" cy="68" rx="20" ry="25" rx="20" ry="25" fill="#3b82f6" opacity="0.7" transform="rotate(-20,290,68)"/>
+  <ellipse cx="290" cy="68" rx="14" ry="19" fill="none" stroke="#e2e8f0" stroke-width="0.8" opacity="0.5" transform="rotate(-20,290,68)"/>
+  <line x1="280" y1="88" x2="275" y2="100" stroke="#3b82f6" stroke-width="4" stroke-linecap="round"/>
+  <!-- NVZ label -->
+  <text x="200" y="117" text-anchor="middle" fill="#3b82f6" font-family="system-ui,sans-serif" font-size="8" font-weight="600" opacity="0.7">NVZ</text>
+  <!-- Label -->
+  <rect x="142" y="196" width="116" height="22" rx="11" fill="rgba(59,130,246,0.15)" stroke="rgba(59,130,246,0.3)" stroke-width="1"/>
+  <text x="200" y="211" text-anchor="middle" fill="#3b82f6" font-family="system-ui,sans-serif" font-size="11" font-weight="600">Sân Pickleball</text>
+</svg>

@@ -1,0 +1,36 @@
+name: sportbooking-pro
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: sportbooking-pro-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/sport_court.db:/app/sport_court.db
+    env_file:
+      - ./backend/.env
+    environment:
+      - PYTHONUNBUFFERED=1
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: sportbooking-pro-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: sportbooking-pro-tunnel
+    restart: unless-stopped
+    command: tunnel --no-autoupdate --url http://frontend:5173
+    depends_on:
+      - frontend
