@@ -1,27 +1,27 @@
-# Test databases (Pytest SQLite artifacts)
-test_*.db
-test_*.db*
-*.db-journal
-*.db-wal
-*.db-shm
+# ==============================================================================
+# SportBooking Pro - Git Ignore Rules
+# ==============================================================================
 
-# Python & Virtual Environment
+# Python & Virtual Environments
 __pycache__/
 *.py[cod]
 *$py.class
 venv/
 .venv/
 env/
-.env
-.env.*
-!.env.example
+ENV/
 
 # Pytest & Coverage
 .pytest_cache/
 .coverage
 htmlcov/
+test_*.db
+test_*.db*
+*.db-journal
+*.db-wal
+*.db-shm
 
-# Node & Frontend
+# Node.js & Frontend Build Artifacts
 node_modules/
 dist/
 dist-ssr/
@@ -31,16 +31,29 @@ yarn-debug.log*
 yarn-error.log*
 *.timestamp-*.mjs
 
-# IDE & Editor files
-.vscode/
+# Environment Variables & Secrets
+.env
+.env.*
+!.env.example
+
+# Redundant or Duplicate Databases
+/sport_court.db
+sport_booking.db
+*.db.bak
+
+# IDE & Editor Configuration
+.vscode/*
+!.vscode/settings.json
 .idea/
 *.swp
 *.swo
 
-# OS generated files
+# OS Generated Files
 Thumbs.db
 Desktop.ini
 .DS_Store
 
-# Explicitly ensure sample database is preserved for evaluation
+# ==============================================================================
+# Whitelist Sample Production Database (Required for Docker Evaluation)
+# ==============================================================================
 !backend/sport_court.db

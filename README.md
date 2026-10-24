@@ -14,7 +14,7 @@
 ### 1.1. Bối cảnh & Bài toán Thực tế
 Trong kinh doanh sân thể thao hiện đại, các cụm phức hợp thường khai thác nhiều loại hình sân khác nhau: **Sân Bóng đá mini cỏ nhân tạo**, **Sân Cầu lông trong nhà tiêu chuẩn**, và các cụm **Sân Pickleball** đang phát triển mạnh mẽ. Tuy nhiên, phần lớn các cơ sở hiện nay vẫn vận hành theo phương thức truyền thống:
 - **Xung đột & Trùng lịch (Double-Booking):** Tiếp nhận đặt sân phân tán qua điện thoại, Zalo, sổ tay hoặc bảng tính Excel rời rạc dẫn đến việc ghi nhận trùng giờ, gây ảnh hưởng tiêu cực đến trải nghiệm của khách hàng và uy tín của cơ sở.
-- **Thiếu minh bạch tài chính & Khó đối soát tiền cọc:** Quy trình thu cọc, giữ chỗ, quyết toán hóa đơn cuối buổi và áp dụng chính sách hoàn tiền cọc khi hủy lịch cận giờ diễn ra thủ công, dễ thất thoát và khó kiểm tra chéo giữa ca trực.
+- **Thiếu minh bạch tài chính & Khó đối soát tiền cọc:** Quy trình thu cọc, giữ chỗ, quyết toán hóa đơn cuối buổi và áp dụng chính sách hoàn tiền cọc khi khách hủy lịch cận giờ diễn ra thủ công, dễ thất thoát và khó kiểm tra chéo giữa ca trực.
 - **Lãng phí công suất ngoài giờ cao điểm:** Các khung giờ thấp điểm (sáng sớm, đầu giờ chiều các ngày trong tuần) thường vắng khách nhưng chủ cơ sở thiếu công cụ phân tích dữ liệu để đưa ra các gói khuyến mại hoặc chính sách định giá linh hoạt kịp thời.
 
 ### 1.2. Giải pháp của Hệ thống SportBooking Pro
@@ -91,129 +91,52 @@ flowchart TD
 
 ---
 
-## 3. Kiến trúc Hệ thống & Công nghệ Sử dụng
+## 3. Cấu trúc Thư mục Chuẩn hóa Cấp Gốc (Root Level)
 
-### 3.1. Sơ đồ Kiến trúc Tổng thể (System Architecture)
-
-```mermaid
-graph TB
-    subgraph ClientLayer [Tầng Giao diện - Client Side]
-        Browser["Trình duyệt Web (Desktop / Tablet quầy lễ tân)"]
-        ReactApp["React 18 + Vite SPA\n(Vanilla CSS / Dark Mode / Glassmorphism)"]
-        Browser --> ReactApp
-    end
-
-    subgraph GatewayLayer [Tầng Cổng dịch vụ & Web Server]
-        Nginx["Nginx Alpine (Reverse Proxy & Static Cache Port 5173)"]
-        ReactApp --> Nginx
-    end
-
-    subgraph ServiceLayer [Tầng Ứng dụng Backend - Application Server]
-        FastAPI["FastAPI Python Async Server (Port 8000)"]
-        AuthModule["Auth & RBAC (JWT + Bcrypt)"]
-        BookingEngine["Booking Engine (Conflict Resolution)"]
-        FinanceModule["Finance & Refund Settlement"]
-        AIService["AI Integration Service"]
-        
-        Nginx -->|Proxy API Requests| FastAPI
-        FastAPI --> AuthModule
-        FastAPI --> BookingEngine
-        FastAPI --> FinanceModule
-        FastAPI --> AIService
-    end
-
-    subgraph DataLayer [Tầng Dữ liệu & AI Bên ngoài]
-        SQLite[(SQLite Database Engine\nsport_court.db)]
-        SQLAlchemy["SQLAlchemy 2.0 ORM\n(ACID & Transaction Lock)"]
-        GeminiAPI["Google Gemini AI API\n(gemini-3.6-flash)"]
-        
-        BookingEngine --> SQLAlchemy
-        FinanceModule --> SQLAlchemy
-        SQLAlchemy --> SQLite
-        AIService -->|HTTPS REST| GeminiAPI
-    end
-```
-
-### 3.2. Chi tiết Ngăn xếp Công nghệ (Tech Stack)
-
-- **Backend Framework:** **FastAPI** (Python 3.10+ / 3.11)
-  - Kiến trúc bất đồng bộ (Asynchronous ASGI) cho tốc độ phản hồi cực nhanh (< 50ms cho các API nghiệp vụ).
-  - Sử dụng **Pydantic v2** để kiểm thực chặt chẽ cấu trúc dữ liệu đầu vào/đầu ra (Data Validation).
-  - Tự động sinh tài liệu chuẩn hóa tương tác theo chuẩn **OpenAPI / Swagger UI**.
-- **Cơ sở dữ liệu & ORM:** **SQLAlchemy 2.0** kết hợp **SQLite Engine** (`sport_court.db`)
-  - Thiết kế chuẩn hóa theo mô hình quan hệ (RDBMS), đảm bảo tính toàn vẹn khóa ngoại (Foreign Keys) và tuân thủ nguyên lý ACID.
-  - Sử dụng khóa dòng giao dịch (`with_for_update`) giải quyết triệt để bài toán đồng thời (Concurrency Control).
-- **Frontend Framework:** **React 18** & **Vite 5**
-  - **Vite:** Công cụ đóng gói hiện đại, hỗ trợ Hot Module Replacement (HMR) tức thì.
-  - **Styling:** **Vanilla CSS** theo hệ thống Design System riêng biệt, tối ưu hiệu năng render, áp dụng phong cách thiết kế cao cấp **Dark Mode kết hợp hiệu ứng kính mờ (Glassmorphism)**.
-  - **Data Visualization & Icons:** Thư viện **Recharts** dựng biểu đồ doanh thu tương tác và bộ icon chuẩn mực **Lucide-react**.
-- **Tích hợp Trí tuệ Nhân tạo (AI Engine):** **Google Gemini AI API**
-  - Khai thác mô hình ngôn ngữ lớn tốc độ cao `gemini-3.6-flash` / `gemini-1.5-flash`.
-  - Thiết kế Prompt chuyên biệt cho ngữ cảnh quản lý thể thao, tích hợp bảng nhật ký `ai_logs` theo dõi thời gian phản hồi (latency), lượng token tiêu thụ và cơ chế phục hồi lỗi (Fault Tolerance Fallback).
-- **Đóng gói & Ảo hóa:** **Docker & Docker Compose**
-  - `backend/Dockerfile`: Môi trường Python Slim tối ưu dung lượng và thời gian khởi động.
-  - `frontend/Dockerfile`: Mô hình Multi-stage build với máy chủ **Nginx Alpine** siêu nhẹ đóng vai trò Reverse Proxy chuyển tiếp các API `/auth`, `/bookings`, `/courts`...
-
----
-
-## 4. Cấu trúc Thư mục Dự án
+Cấu trúc dự án được chuẩn hóa tinh gọn đúng theo mẫu chuẩn trên GitHub:
 
 ```
 DTC245180183-sportbooking-ai/
-├── .env.example                # File mẫu cấu hình biến môi trường toàn cục
-├── .gitignore                  # Cấu hình loại trừ mã nguồn rác, cache và môi trường ảo
-├── docker-compose.yml          # Kịch bản triển khai đa dịch vụ Docker (Backend, Frontend)
-├── project_documents.md        # Tài liệu phân tích thiết kế hệ thống & lược đồ CSDL
-├── README.md                   # Tài liệu báo cáo chính thức của đồ án (file hiện tại)
-├── WORKFLOW.md                 # Nhật ký quy trình kiểm thử và luồng nghiệp vụ
-│
-├── backend/                    # Mã nguồn Máy chủ Dịch vụ (FastAPI)
-│   ├── .dockerignore           # Loại trừ thư mục không cần thiết khi build Docker
-│   ├── .env.example            # Biến môi trường mẫu cho Backend
-│   ├── .gitignore              # Gitignore cục bộ cho môi trường Python
-│   ├── Dockerfile              # Dockerfile đóng gói ứng dụng FastAPI
-│   ├── requirements.txt        # Danh mục thư viện Python (FastAPI, SQLAlchemy, Gemini...)
-│   ├── sport_court.db          # CSDL SQLite mẫu chuẩn hóa (đã nạp sẵn 12 đơn & dữ liệu gốc)
-│   └── app/
-│       ├── main.py             # Điểm khởi động ứng dụng FastAPI & đăng ký Routers
-│       ├── database.py         # Khởi tạo kết nối SQLAlchemy Engine & SessionLocal
-│       ├── dependencies.py     # Middleware xác thực JWT & phân quyền RBAC
-│       ├── ai/                 # Tầng tích hợp Trí tuệ Nhân tạo
-│       │   ├── gemini_client.py# Client giao tiếp Google Gemini API & cơ chế Retry
-│       │   └── prompts.py      # Bộ thư viện System & User Prompts chuẩn hóa
-│       ├── core/               # Cấu hình hệ thống & nạp biến môi trường Settings
-│       ├── models/             # Định nghĩa các thực thể CSDL (User, Court, Booking, Payment...)
-│       ├── routers/            # Các điểm cuối API (Auth, Courts, Bookings, AI, Statistics...)
-│       ├── schemas/            # Lược đồ Pydantic kiểm thực dữ liệu (Request/Response DTO)
-│       └── services/           # Nghiệp vụ lõi (Booking Service, AI Log Service)
-│
-├── frontend/                   # Mã nguồn Giao diện Người dùng (React + Vite)
-│   ├── .dockerignore           # Loại trừ thư mục build/node_modules khi build Docker
-│   ├── Dockerfile              # Dockerfile Multi-stage (Node Build -> Nginx Serve)
+├── .github/workflows/          # Kịch bản CI/CD tự động (Pytest & Frontend Build)
+│   └── ci.yml
+├── backend/                    # Mã nguồn Máy chủ Dịch vụ (FastAPI & SQLite)
+│   ├── app/                    # Ứng dụng nghiệp vụ (routers, models, schemas, services, ai)
+│   ├── tests/                  # Bộ kiểm thử tự động toàn diện Pytest
+│   ├── sport_court.db          # Cơ sở dữ liệu mẫu đang chạy (12 đơn, thực thu 1,750,000đ)
+│   ├── requirements.txt        # Danh mục thư viện Python phụ thuộc
+│   └── Dockerfile              # Dockerfile tối ưu cho Python FastAPI
+├── database/                   # Định nghĩa & Dữ liệu CSDL chuẩn hóa cấp gốc
+│   ├── schema.sql              # Toàn bộ câu lệnh DDL khởi tạo 9 bảng và chỉ mục
+│   ├── seed_data.sql           # Dữ liệu hạt giống chuẩn hóa (DML) 12 đơn & 10 giao dịch
+│   └── README.md               # Đặc tả chi tiết CSDL, ERD và bảng đối soát 1,750,000đ
+├── docs/                       # Thư viện toàn bộ tài liệu nghiên cứu & báo cáo học phần
+│   ├── WORKFLOW.md             # Quy trình phát triển phần mềm theo các mốc SDLC (KT1-KT3)
+│   ├── project_documents.md    # Tài liệu phân tích yêu cầu & thiết kế hệ thống gốc
+│   ├── use_cases.md            # Đặc tả chi tiết 12 Ca sử dụng kèm kịch bản luồng sự kiện
+│   ├── database_design.md      # Thiết kế chi tiết cơ sở dữ liệu & quan hệ thực thể
+│   ├── requirements.md         # Đặc tả yêu cầu phần mềm chi tiết (SRS)
+│   ├── code_review_ai.md       # Báo cáo đánh giá chất lượng mã nguồn từ AI
+│   ├── prompt_experiment_results.md # Báo cáo thực nghiệm tối ưu hóa Prompt Gemini
+│   ├── ai_log.md               # Nhật ký kỹ thuật tích hợp AI, cấu hình fallback & latency
+│   ├── system_design_prompts.md# Bộ prompts thiết kế kiến trúc hệ thống
+│   ├── UI-UX-DESIGN.md         # Tài liệu phân tích và thiết kế giao diện Glassmorphism
+│   └── bao-cao-cuoi-ky.md      # Đề cương báo cáo đồ án kết thúc học phần
+├── frontend/                   # Mã nguồn Giao diện Người dùng (React 18 + Vite 5 SPA)
+│   ├── src/                    # Components, Pages, Contexts, APIs
 │   ├── nginx.conf              # Cấu hình Reverse Proxy Nginx điều hướng API & SPA routing
-│   ├── package.json            # Danh mục phụ thuộc Frontend (React, Lucide, Recharts...)
-│   ├── vite.config.js          # Cấu hình Vite Dev Server & Proxy cục bộ
-│   ├── index.html              # Trang gốc ứng dụng Single Page Application
-│   └── src/
-│       ├── App.jsx             # Điều hướng trung tâm (React Router) & Layout bọc
-│       ├── main.jsx            # Điểm gắn kết React DOM
-│       ├── api/                # Các module gọi API qua Axios
-│       ├── components/         # Các thành phần giao diện tái sử dụng (Header, Sidebar, Modal...)
-│       ├── context/            # Ngữ cảnh quản lý phiên đăng nhập (AuthContext)
-│       └── pages/              # Các màn hình nghiệp vụ (Dashboard, Calendar, Analytics...)
-│
-└── docs/                       # Tài liệu nghiên cứu chuyên sâu & minh chứng đồ án
-    ├── ai_log.md               # Nhật ký kỹ thuật tích hợp AI & kịch bản prompt
-    ├── database_design.md      # Lược đồ quan hệ thực thể (ERD) & chi tiết bảng
-    ├── requirements.md         # Đặc tả yêu cầu phần mềm chi tiết (SRS)
-    └── use_cases.md            # Tài liệu đặc tả 12 Ca sử dụng kèm kịch bản luồng sự kiện
+│   ├── package.json            # Danh mục phụ thuộc Frontend
+│   └── Dockerfile              # Dockerfile Multi-stage (Node Build -> Nginx Alpine)
+├── .env.example                # File mẫu cấu hình biến môi trường chuẩn cấp gốc
+├── .gitignore                  # Cấu hình loại trừ rác, cache và bảo mật
+├── README.md                   # Tài liệu báo cáo chính thức của đồ án (file hiện tại)
+└── docker-compose.yml          # Kịch bản triển khai trọn gói Docker đa dịch vụ
 ```
 
 ---
 
-## 5. Hướng dẫn Triển khai & Khởi chạy
+## 4. Hướng dẫn Triển khai & Khởi chạy
 
-### 5.1. Triển khai Nhanh bằng Docker & Docker Compose (Khuyến nghị để Chấm điểm)
+### 4.1. Triển khai Nhanh bằng Docker & Docker Compose (Khuyến nghị để Chấm điểm)
 
 Toàn bộ hệ thống Backend, Frontend và Cơ sở dữ liệu mẫu đã được cấu hình trọn gói trong Docker Compose. Giảng viên và người đánh giá có thể chạy dự án ngay lập tức bằng các bước sau:
 
@@ -227,9 +150,6 @@ Từ thư mục gốc của dự án, tạo file `.env` cho backend từ file m�
   ```bash
   cp backend/.env.example backend/.env
   ```
-
-> [!NOTE]
-> File `.env.example` đã được điền sẵn khóa API thử nghiệm cho Google Gemini AI (`GEMINI_API_KEY`). Nếu muốn sử dụng khóa cá nhân của bạn, hãy mở file `backend/.env` và cập nhật giá trị `GEMINI_API_KEY`.
 
 #### Bước 2: Xây dựng và khởi chạy các Container
 Chạy lệnh duy nhất sau tại thư mục gốc:
@@ -245,7 +165,7 @@ Sau khi các container khởi động hoàn tất (khoảng 30 - 60 giây cho l�
 
 ---
 
-### 5.2. Khởi chạy Cục bộ (Local Development)
+### 4.2. Khởi chạy Cục bộ (Local Development)
 
 Nếu muốn khởi chạy và gỡ lỗi (debug) từng thành phần trong môi trường phát triển:
 
@@ -253,28 +173,10 @@ Nếu muốn khởi chạy và gỡ lỗi (debug) từng thành phần trong mô
 1. Mở cửa sổ Terminal thứ nhất và di chuyển vào thư mục `backend`:
    ```bash
    cd backend
-   ```
-2. Tạo và kích hoạt môi trường ảo Python:
-   - **Windows:**
-     ```powershell
-     python -m venv venv
-     .\venv\Scripts\activate
-     ```
-   - **Linux / macOS:**
-     ```bash
-     python3 -m venv venv
-     source venv/bin/activate
-     ```
-3. Cài đặt các thư viện phụ thuộc:
-   ```bash
+   python -m venv venv
+   .\venv\Scripts\activate   # Trên Linux/Mac: source venv/bin/activate
    pip install -r requirements.txt
-   ```
-4. Đảm bảo file `.env` đã được tạo từ `.env.example`:
-   ```powershell
-   copy .env.example .env
-   ```
-5. Khởi chạy máy chủ phát triển Uvicorn:
-   ```bash
+   copy .env.example .env     # Trên Linux/Mac: cp .env.example .env
    uvicorn app.main:app --reload --port 8000
    ```
    *Máy chủ API sẽ hoạt động tại: `http://localhost:8000`*
@@ -283,20 +185,14 @@ Nếu muốn khởi chạy và gỡ lỗi (debug) từng thành phần trong mô
 1. Mở cửa sổ Terminal thứ hai và di chuyển vào thư mục `frontend`:
    ```bash
    cd frontend
-   ```
-2. Cài đặt các gói thư viện Node.js:
-   ```bash
    npm install
-   ```
-3. Khởi chạy Vite Dev Server:
-   ```bash
    npm run dev
    ```
    *Giao diện người dùng sẽ sẵn sàng tại: `http://localhost:5173`*
 
 ---
 
-### 5.3. Tài khoản Đăng nhập Mẫu & Dữ liệu Kiểm thử Sẵn có
+### 4.3. Tài khoản Đăng nhập Mẫu & Dữ liệu Kiểm thử Sẵn có
 
 Trong cơ sở dữ liệu mẫu `backend/sport_court.db` đi kèm, hệ thống đã nạp sẵn các tài khoản với phân quyền tương ứng để phục vụ việc nghiệm thu ngay lập tức:
 
@@ -305,10 +201,233 @@ Trong cơ sở dữ liệu mẫu `backend/sport_court.db` đi kèm, hệ thống
 | **Quản trị viên (Admin)** | `admin` | `admin123` | Toàn quyền cấu hình sân, bảng giá, xem thống kê biểu đồ doanh thu, quản lý tài khoản nhân viên và sử dụng AI phân tích kinh doanh. |
 | **Nhân viên trực quầy (Staff)** | `staff` | `staff123` | Quản lý lưới lịch đặt sân, thực hiện tạo đơn, thu cọc, đổi sân, hoàn tiền và gọi trợ lý AI gợi ý khung giờ / tạo tin nhắn khách hàng. |
 
-#### 📊 Thông tin Dữ liệu Mẫu trong CSDL:
-- **Danh mục Sân thể thao:** 3 sân chính đại diện cho các bộ môn phổ biến (Sân Bóng đá mini cỏ nhân tạo, Sân Cầu lông tiêu chuẩn, Sân Pickleball chuyên nghiệp).
-- **12 Đơn đặt sân chuẩn mẫu:** Trải đều trên các trạng thái nghiệp vụ thực tế (`completed` - đã thanh toán toàn phần, `cancelled` - đã hủy và hoàn cọc minh bạch, `booked` - đã cọc và đang giữ chỗ).
-- **Hạch toán Dòng tiền Chuẩn:** Tổng thực thu trong cơ sở dữ liệu mẫu đạt **1,750,000 VNĐ** (đã trừ khoản tiền hoàn cọc hợp lệ), phản ánh chính xác báo cáo doanh thu trên màn hình Dashboard và biểu đồ thống kê tài chính.
+---
+
+## 5. Bảng Đối Soát Dữ Liệu Thực Thu Chuẩn (1,750,000 VNĐ)
+
+Cơ sở dữ liệu [backend/sport_court.db](file:///c:/Users/HP/OneDrive/Desktop/DỰ%20ÁN%20NHÓM%2014/backend/sport_court.db) được thiết lập sẵn **12 đơn đặt sân thực tế** phản ánh đầy đủ quy trình thu chi tại cơ sở:
+
+- **Tổng doanh thu từ 8 đơn hoàn tất (`completed`):** `1,600,000 VNĐ`
+- **Tổng tiền cọc thu giữ từ 2 đơn hủy vi phạm quy định (`cancelled`):** `150,000 VNĐ` (#11 giữ 100k, #12 giữ 50k)
+- **Tổng tiền cọc hoàn trả minh bạch cho 2 đơn hủy hợp lệ (`cancelled` + `refunded`):** `200,000 VNĐ` (#2 hoàn 100k, #7 hoàn 100k)
+- **TỔNG THỰC THU RÒNG (NET REVENUE):** `1,600,000đ + 150,000đ =` **`1,750,000 VNĐ`**.
+
+Chi tiết từng đơn được minh bạch hóa tại [database/README.md](file:///c:/Users/HP/OneDrive/Desktop/DỰ%20ÁN%20NHÓM%2014/database/README.md#4-bảng-đối-soát-tài-chính-12-đơn-mẫu-tổng-thực-thu-1750000-vnđ).
+
+---
+
+## 6. Thiết Kế Kiến Trúc Hệ Thống
+
+### 6.1. Kiến Trúc Tổng Thể 4 Tầng (4-Tier Architecture)
+
+```mermaid
+graph TB
+    subgraph Tier1 [Tầng 1: Trình diễn - Presentation Tier]
+        UI["React 18 SPA (Vite 5)\nVanilla CSS / Dark Mode / Glassmorphism"]
+        ClientDevices["Thiết bị: Desktop / Tablet Quầy Lễ Tân"]
+        ClientDevices --> UI
+    end
+
+    subgraph Tier2 [Tầng 2: Cổng Dịch Vụ & Reverse Proxy]
+        NginxProxy["Nginx Alpine Server (Port 5173)\nGzip Compression & SPA Fallback Routing"]
+        UI --> NginxProxy
+    end
+
+    subgraph Tier3 [Tầng 3: Xử lý Nghiệp Vụ - Business Logic Tier]
+        FastAPIServer["FastAPI Python Async Engine (Port 8000)"]
+        AuthService["Module Xác thực & RBAC (JWT + Bcrypt)"]
+        BookingEngine["Booking Engine (Conflict Resolution)"]
+        FinanceService["Finance & Refund Settlement Service"]
+        AILogService["AI Integration & Logging Service"]
+
+        NginxProxy -->|Proxy /auth, /bookings, /courts...| FastAPIServer
+        FastAPIServer --> AuthService
+        FastAPIServer --> BookingEngine
+        FastAPIServer --> FinanceService
+        FastAPIServer --> AILogService
+    end
+
+    subgraph Tier4 [Tầng 4: Dữ Liệu & Dịch Vụ Thông Minh - Data & AI Tier]
+        SQLAlchemyORM["SQLAlchemy 2.0 ORM Engine"]
+        SQLiteDB[(SQLite Database Engine\nbackend/sport_court.db)]
+        GoogleGemini["Google Gemini AI API\n(Model: gemini-3.6-flash)"]
+
+        BookingEngine --> SQLAlchemyORM
+        FinanceService --> SQLAlchemyORM
+        SQLAlchemyORM --> SQLiteDB
+        AILogService -->|HTTPS REST API Call| GoogleGemini
+    end
+```
+
+### 6.2. Sơ Đồ Luồng Dữ Liệu Chính (Core Data Flows)
+
+#### A. Luồng Đặt Sân & Khóa Lịch Bảo Trì (Chống Trùng Lịch)
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Staff as Nhân viên lễ tân
+    participant FE as Giao diện Lưới Lịch (React)
+    participant BE as FastAPI Booking Service
+    participant DB as SQLite (sport_court.db)
+
+    Staff->>FE: Chọn sân, khung giờ và nhập SĐT khách
+    FE->>BE: POST /bookings (court_id, time_slot_id, deposit)
+    activate BE
+    BE->>DB: BEGIN TRANSACTION
+    BE->>DB: SELECT * FROM time_slots WHERE id = slot_id FOR UPDATE
+    alt Slot đã bị đặt hoặc đang bảo trì
+        BE-->>FE: HTTP 400 Bad Request ("Khung giờ đã kín lịch hoặc bảo trì")
+        FE-->>Staff: Báo lỗi xung đột & Kích hoạt nút "AI Gợi ý Giờ Trống"
+    else Slot khả dụng (available)
+        BE->>DB: UPDATE time_slots SET status = 'booked'
+        BE->>DB: INSERT INTO bookings (...)
+        BE->>DB: COMMIT TRANSACTION
+        BE-->>FE: HTTP 201 Created (Booking details)
+        FE-->>Staff: Cập nhật ô lịch sang màu Xanh đậm (Đã đặt)
+    end
+    deactivate BE
+```
+
+#### B. Luồng Đối Soát Tiền Cọc, Thanh Toán & Hoàn Cọc (1,750,000 VNĐ)
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Customer as Khách hàng
+    actor Staff as Nhân viên quầy
+    participant BE as FastAPI Payment Service
+    participant DB as SQLite (sport_court.db)
+
+    Customer->>Staff: Yêu cầu trả sân / hoặc Yêu cầu hủy lịch trước giờ
+    alt Trường hợp 1: Hoàn tất sử dụng sân (Completed)
+        Staff->>BE: POST /bookings/{id}/complete (thanh toán phần còn lại)
+        BE->>DB: INSERT INTO payments (amount, method, status='paid')
+        BE->>DB: UPDATE bookings SET status = 'completed'
+        BE-->>Staff: Hóa đơn thanh toán hoàn tất (Cọc + Tiền giờ)
+    else Trường hợp 2: Hủy lịch sớm hợp lệ (Refund)
+        Staff->>BE: POST /bookings/{id}/cancel (lý do hủy trước 24h)
+        BE->>DB: INSERT INTO payments (amount=deposit, status='refunded')
+        BE->>DB: UPDATE bookings SET status = 'cancelled'
+        BE->>DB: UPDATE time_slots SET status = 'available' (Giải phóng sân)
+        BE-->>Staff: Biên nhận hoàn tiền cọc cho khách
+    else Trường hợp 3: Hủy sát giờ (Retain Deposit)
+        Staff->>BE: POST /bookings/{id}/cancel (hủy cận giờ)
+        BE->>DB: UPDATE bookings SET status = 'cancelled', note='[Giữ cọc]'
+        BE->>DB: UPDATE time_slots SET status = 'available'
+        BE-->>Staff: Ghi nhận doanh thu giữ cọc (Không hoàn tiền)
+    end
+```
+
+#### C. Luồng Tương Tác với Trí Tuệ Nhân Tạo (Google Gemini AI)
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as Nhân viên / Quản lý
+    participant BE as FastAPI AI Router
+    participant Gemini as Google Gemini AI API
+    participant Log as Bảng ai_logs (DB)
+
+    User->>BE: Gửi yêu cầu (Gợi ý slot / Sinh tin nhắn / Phân tích doanh thu)
+    activate BE
+    BE->>BE: Đóng gói Metadata & Chuẩn bị System Prompt
+    BE->>Gemini: POST generateContent (Prompt + User Data)
+    activate Gemini
+    alt Gemini phản hồi thành công (< 2s)
+        Gemini-->>BE: Trả về nội dung tư vấn / tin nhắn CSKH
+        BE->>Log: Lưu vết (type, input, output, latency_ms, status='SUCCESS')
+        BE-->>User: Hiển thị kết quả AI lên giao diện trực quan
+    else Sự cố kết nối hoặc Quá tải API
+        Gemini-->>BE: Error (503 / Timeout)
+        BE->>BE: Kích hoạt Fallback Engine (Luật cố định)
+        BE->>Log: Lưu vết (type, input, error_detail, status='FALLBACK')
+        BE-->>User: Trả về kết quả dự phòng chuẩn quy tắc nghiệp vụ
+    end
+    deactivate Gemini
+    deactivate BE
+```
+
+### 6.3. Phân Quyền Tác Nhân Ứng Với 12 Use Cases
+
+```mermaid
+classDiagram
+    class Admin {
+        +UC-01: Quản lý Sân & Bảng giá
+        +UC-02: Thiết lập Khung giờ hoạt động
+        +UC-03: Lập lịch Bảo trì & Khóa sân
+        +UC-04: Thống kê Doanh thu & Công suất
+        +UC-05: Quản lý Tài khoản Nhân viên
+        +UC-06: AI Phân tích & Gợi ý Khuyến mại
+    }
+    class Staff {
+        +UC-07: Xem Lịch đặt sân Trực quan
+        +UC-08: Đặt / Đổi / Hủy Lịch đặt sân
+        +UC-09: Quản lý Hồ sơ Khách hàng
+        +UC-10: Thu cọc, Quyết toán & Hoàn cọc
+        +UC-11: AI Gợi ý Khung giờ trống
+        +UC-12: AI Sinh Tin nhắn CSKH
+    }
+    class Customer {
+        <<Tác nhân phụ>>
+        +Yêu cầu đặt sân qua điện thoại/quầy
+        +Nhận tin nhắn SMS/Zalo xác nhận
+        +Thanh toán tiền cọc & quyết toán
+    }
+
+    Admin --|> Staff : Kế thừa quyền vận hành
+    Customer ..> Staff : Tương tác trực tiếp
+```
+
+### 6.4. Bảng Danh Mục RESTful API Endpoints
+
+Hệ thống cung cấp đầy đủ các điểm cuối API theo chuẩn RESTful, có tài liệu tương tác tại `http://localhost:8000/docs`:
+
+| Nhóm chức năng | Phương thức | Đường dẫn API Endpoint | Quyền hạn | Mô tả chức năng |
+| :--- | :---: | :--- | :---: | :--- |
+| **Xác thực (Auth)** | `POST` | `/auth/login` | Công khai | Đăng nhập hệ thống, trả về Bearer JWT Token. |
+| | `GET` | `/auth/me` | Đã đăng nhập | Lấy thông tin tài khoản và vai trò đang đăng nhập. |
+| | `POST` | `/auth/register` | **Admin** | Đăng ký tài khoản nhân viên mới cho cơ sở. |
+| **Quản lý Sân (Courts)** | `GET` | `/courts` | Tất cả | Lấy danh sách sân thi đấu kèm trạng thái và bảng giá. |
+| | `POST` | `/courts` | **Admin** | Thêm mới sân thi đấu (Bóng đá, Cầu lông, Pickleball). |
+| | `PUT` | `/courts/{id}` | **Admin** | Cập nhật tên sân, loại sân hoặc đơn giá thuê/giờ. |
+| | `DELETE` | `/courts/{id}` | **Admin** | Xóa hoặc ngừng hoạt động một sân thể thao. |
+| **Khung Giờ (Time Slots)** | `GET` | `/time-slots` | Tất cả | Truy vấn danh sách khung giờ theo ngày và sân. |
+| | `POST` | `/time-slots/generate-day` | **Admin** | Tự động sinh ma trận các khung giờ trong ngày. |
+| **Đặt Sân (Bookings)** | `GET` | `/bookings` | Tất cả | Xem danh sách đơn đặt sân (hỗ trợ lọc theo ngày/sân). |
+| | `POST` | `/bookings` | Staff, Admin | Tạo đơn đặt sân mới (kèm cơ chế khóa dòng chống trùng). |
+| | `PUT` | `/bookings/{id}/reschedule` | Staff, Admin | Đổi khung giờ hoặc đổi sân cho khách hàng. |
+| | `POST` | `/bookings/{id}/cancel` | Staff, Admin | Hủy đơn đặt sân, kích hoạt quy trình hoàn cọc/giữ cọc. |
+| | `POST` | `/bookings/{id}/complete` | Staff, Admin | Quyết toán hoàn tất đơn đặt và thu phần tiền còn lại. |
+| **Khách Hàng (Customers)**| `GET` | `/customers` | Staff, Admin | Tìm kiếm danh bạ khách hàng qua Số điện thoại / Tên. |
+| | `POST` | `/customers` | Staff, Admin | Lưu hồ sơ khách hàng mới vào hệ thống. |
+| **Tài Chính (Payments)** | `GET` | `/payments` | **Admin** | Danh sách lịch sử giao dịch thu tiền / hoàn cọc. |
+| | `POST` | `/payments` | Staff, Admin | Tạo phiếu thu cọc hoặc phiếu thu quyết toán. |
+| | `POST` | `/payments/{id}/refund` | Staff, Admin | Thực hiện hoàn tiền cọc theo chính sách hủy lịch. |
+| **Bảo Trì (Maintenance)** | `GET` | `/maintenance` | Tất cả | Lấy danh sách lịch trình bảo trì các sân. |
+| | `POST` | `/maintenance` | **Admin** | Tạo lịch bảo dưỡng mới (tự động khóa slot tương ứng). |
+| **Thống Kê (Statistics)** | `GET` | `/statistics/overview` | **Admin** | Tổng quan doanh thu, số đơn và tỷ lệ lấp đầy sân. |
+| | `GET` | `/statistics/revenue-chart`| **Admin** | Dữ liệu biểu đồ doanh thu theo chuỗi ngày/tháng. |
+| | `GET` | `/statistics/peak-hours` | **Admin** | Phân tích công suất giờ cao điểm và giờ thấp điểm. |
+| **Trí Tuệ Nhân Tạo (AI)** | `POST` | `/ai/suggest-slot` | Staff, Admin | AI gợi ý 3 khung giờ/sân trống tối ưu khi bị trùng lịch. |
+| | `POST` | `/ai/generate-notification`| Staff, Admin | AI sinh nội dung tin nhắn Zalo/SMS xác nhận hoặc nhắc lịch.|
+| | `POST` | `/ai/business-insights` | **Admin** | AI phân tích biểu đồ doanh thu & tư vấn chiến lược giá. |
+
+---
+
+### 6.5. Danh Mục Liên Kết Nhanh Tới Toàn Bộ Tài Liệu Báo Cáo Trong Thư Mục `docs/`
+
+Toàn bộ các tài liệu chuyên đề, thiết kế kỹ thuật và báo cáo học thuật được lưu trữ đầy đủ trong thư mục [docs/](file:///c:/Users/HP/OneDrive/Desktop/DỰ%20ÁN%20NHÓM%2014/docs):
+
+1. 📋 [WORKFLOW.md](file:///c:/Users/HP/OneDrive/Desktop/DỰ%20ÁN%20NHÓM%2014/docs/WORKFLOW.md): Quy trình phát triển phần mềm chi tiết qua các giai đoạn SDLC (Kiểm tra 1 → Kiểm tra 2 → Kiểm tra 3 → Nghiệm thu Cuối kỳ).
+2. 📄 [project_documents.md](file:///c:/Users/HP/OneDrive/Desktop/DỰ%20ÁN%20NHÓM%2014/docs/project_documents.md): Bản phân tích đặc tả yêu cầu, thiết kế CSDL thực thể và các ca sử dụng nền tảng.
+3. 🎯 [use_cases.md](file:///c:/Users/HP/OneDrive/Desktop/DỰ%20ÁN%20NHÓM%2014/docs/use_cases.md): Đặc tả chi tiết 12 Ca sử dụng (Use Cases) kèm kịch bản luồng sự kiện chính, luồng phụ và ngoại lệ.
+4. 🗄️ [database_design.md](file:///c:/Users/HP/OneDrive/Desktop/DỰ%20ÁN%20NHÓM%2014/docs/database_design.md): Tài liệu thiết kế chi tiết cơ sở dữ liệu, từ điển dữ liệu (Data Dictionary) và ràng buộc toàn vẹn.
+5. 📊 [database/README.md](file:///c:/Users/HP/OneDrive/Desktop/DỰ%20ÁN%20NHÓM%2014/database/README.md): Hướng dẫn CSDL cấp gốc, sơ đồ ERD và bảng đối soát chi tiết 12 đơn mẫu thực thu 1,750,000 VNĐ.
+6. 📝 [requirements.md](file:///c:/Users/HP/OneDrive/Desktop/DỰ%20ÁN%20NHÓM%2014/docs/requirements.md): Đặc tả yêu cầu phần mềm chi tiết (SRS - Yêu cầu chức năng & Yêu cầu phi chức năng).
+7. 🤖 [code_review_ai.md](file:///c:/Users/HP/OneDrive/Desktop/DỰ%20ÁN%20NHÓM%2014/docs/code_review_ai.md): Báo cáo đánh giá và thẩm định chất lượng mã nguồn từ Trí tuệ nhân tạo.
+8. 🧪 [prompt_experiment_results.md](file:///c:/Users/HP/OneDrive/Desktop/DỰ%20ÁN%20NHÓM%2014/docs/prompt_experiment_results.md): Báo cáo thực nghiệm so sánh, đo lường và tối ưu hóa Prompt trên mô hình Google Gemini.
+9. 📝 [ai_log.md](file:///c:/Users/HP/OneDrive/Desktop/DỰ%20ÁN%20NHÓM%2014/docs/ai_log.md): Nhật ký kỹ thuật tích hợp AI, cấu hình fallback dự phòng và đo lường độ trễ (latency metrics).
+10. 💡 [system_design_prompts.md](file:///c:/Users/HP/OneDrive/Desktop/DỰ%20ÁN%20NHÓM%2014/docs/system_design_prompts.md): Bộ prompts tiêu chuẩn phục vụ thiết kế kiến trúc hệ thống và luồng giao dịch.
+11. 🎨 [UI-UX-DESIGN.md](file:///c:/Users/HP/OneDrive/Desktop/DỰ%20ÁN%20NHÓM%2014/docs/UI-UX-DESIGN.md): Tài liệu phân tích và thiết kế trải nghiệm người dùng phong cách Glassmorphism & Dark Mode.
+12. 🎓 [bao-cao-cuoi-ky.md](file:///c:/Users/HP/OneDrive/Desktop/DỰ%20ÁN%20NHÓM%2014/docs/bao-cao-cuoi-ky.md): Đề cương và dàn ý tổng hợp phục vụ buổi báo cáo nghiệm thu học phần.
 
 ---
 
