@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { bookingsAPI, customersAPI, courtsAPI, timeSlotsAPI, paymentsAPI } from '../../api';
-import { CalendarCheck, X, RefreshCw, RotateCcw, Search, CreditCard, ArrowLeftRight, Sparkles, Eye, Plus, CheckCircle, ShieldCheck } from 'lucide-react';
+import { CalendarCheck, X, RefreshCw, RotateCcw, CreditCard, ArrowLeftRight, Sparkles, Eye, Plus, CheckCircle, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../components/ui/Toast';
-import { Button, Card, Badge, Modal, Input, Select, Table, EmptyState } from '../../components/ui';
+import { Button, Card, Badge, Modal, Input, Select, Table, ConfirmModal, CustomerAvatar, CustomerPopover, Pagination } from '../../components/ui';
+import { useDebounce } from '../../utils/useDebounce';
 import AISuggestModal from './AISuggestModal';
 import BookingDetailModal from './BookingDetailModal';
 
@@ -21,20 +22,26 @@ const PAYMENT_METHODS = [
 ];
 
 export default function Bookings() {
-  const { user } = useAuth();
+  const { user: _currentUser } = useAuth();
   const { showToast } = useToast();
+  const [confirmBookingId, setConfirmBookingId] = useState(null);
+  const [confirmLoading, setConfirmLoading] = useState(false);
   const [bookings, setBookings]   = useState([]);
   const [customers, setCustomers] = useState([]);
   const [courts, setCourts]       = useState([]);
-  const [slots, setSlots]         = useState([]);
   const [loading, setLoading]     = useState(false);
   const [cancellingId, setCancellingId] = useState(null); // id booking đang bị hủy
 
   // Filters & Search
   const [searchTerm, setSearchTerm]     = useState('');
+  const debouncedSearch = useDebounce(searchTerm, 300);
   const [filterStatus, setFilterStatus] = useState('');
   const [filterCourt, setFilterCourt]   = useState('');
   const [filterDate, setFilterDate]     = useState('');
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   // Create form
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -64,15 +71,7 @@ export default function Bookings() {
   const [refundForm, setRefundForm] = useState({ method: 'cash', reason: '' });
 
   /* ── Data fetching ────────────────────────────── */
-  useEffect(() => {
-    fetchAll();
-    customersAPI.getAll({}).then(setCustomers).catch(() => {});
-    courtsAPI.getAll({}).then(setCourts).catch(() => {});
-  }, []);
-
-  useEffect(() => { fetchAll(); }, [filterStatus, filterCourt, filterDate]);
-
-  const fetchAll = async () => {
+  const fetchAll = useCallback(async () => {
     setLoading(true);
     const params = {};
     if (filterStatus) params.status    = filterStatus;
@@ -80,26 +79,48 @@ export default function Bookings() {
     if (filterDate)   { params.date_from = filterDate; params.date_to = filterDate; }
     try {
       const data = await bookingsAPI.getAll(params);
-      setBookings(data.reverse());
-    } catch (e) {}
-    setLoading(false);
-  };
+      setBookings(Array.isArray(data) ? [...data].reverse() : []);
+    } catch (e) {
+      console.error('Lỗi tải danh sách đặt sân:', e);
+    } finally {
+      setLoading(false);
+    }
+  }, [filterStatus, filterCourt, filterDate]);
 
-  const fetchAvailableSlots = () => {
+  useEffect(() => {
+    fetchAll();
+  }, [fetchAll]);
+
+  useEffect(() => {
+    customersAPI.getAll({}).then(setCustomers).catch(() => {});
+    courtsAPI.getAll({}).then(setCourts).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearch, filterStatus, filterCourt, filterDate]);
+
+  const fetchAvailableSlots = useCallback(() => {
     if (createForm.court_id && createDate) {
       timeSlotsAPI.getAll({ court_id: createForm.court_id, filter_date: createDate, status: 'available' })
         .then(setAvailableSlots).catch(() => setAvailableSlots([]));
     } else { setAvailableSlots([]); }
-  };
-  useEffect(() => { fetchAvailableSlots(); }, [createForm.court_id, createDate]);
+  }, [createForm.court_id, createDate]);
 
-  const fetchRescheduleSlots = () => {
+  useEffect(() => { 
+    fetchAvailableSlots(); 
+  }, [fetchAvailableSlots]);
+
+  const fetchRescheduleSlots = useCallback(() => {
     if (rescheduleForm.court_id && rescheduleForm.date) {
       timeSlotsAPI.getAll({ court_id: rescheduleForm.court_id, filter_date: rescheduleForm.date, status: 'available' })
         .then(setRescheduleSlots).catch(() => setRescheduleSlots([]));
     } else { setRescheduleSlots([]); }
-  };
-  useEffect(() => { fetchRescheduleSlots(); }, [rescheduleForm.court_id, rescheduleForm.date]);
+  }, [rescheduleForm.court_id, rescheduleForm.date]);
+
+  useEffect(() => { 
+    fetchRescheduleSlots(); 
+  }, [fetchRescheduleSlots]);
 
   /* ── Handlers ─────────────────────────────────── */
   const handleCreate = async (e) => {
@@ -141,14 +162,18 @@ export default function Bookings() {
     }
   };
 
-  const handleConfirm = async (id) => {
-    if (!confirm('Xác nhận lịch đặt này?')) return;
+  const handleConfirmSubmit = async () => {
+    if (!confirmBookingId) return;
+    setConfirmLoading(true);
     try {
-      await bookingsAPI.confirm(id);
+      await bookingsAPI.confirm(confirmBookingId);
       showToast({ type: 'success', message: 'Đã xác nhận lịch đặt' });
+      setConfirmBookingId(null);
       fetchAll();
     } catch (err) {
       showToast({ type: 'error', message: err.response?.data?.detail || 'Xác nhận thất bại' });
+    } finally {
+      setConfirmLoading(false);
     }
   };
 
@@ -269,51 +294,43 @@ export default function Bookings() {
   const getCourtName     = (id) => courts.find(c    => c.id === id)?.name      || `Sân#${id}`;
 
   /* ── Filtered bookings & Summary stats ────────── */
-  const filteredBookings = bookings.filter(b => {
-    if (!searchTerm) return true;
-    const term = searchTerm.toLowerCase().trim();
-    const custName = (b.customer?.full_name || getCustomerName(b.customer_id) || '').toLowerCase();
-    const custPhone = (b.customer?.phone || getCustomerPhone(b.customer_id) || '').toLowerCase();
-    const note = (b.note || '').toLowerCase();
-    const courtName = (b.court?.name || getCourtName(b.court_id) || '').toLowerCase();
-    const idStr = `#${b.id}`;
-    return custName.includes(term) || custPhone.includes(term) || note.includes(term) || courtName.includes(term) || idStr.includes(term) || String(b.id) === term;
-  });
-
-  const summaryStats = (() => {
-    const total = filteredBookings.length;
-    const confirmed = filteredBookings.filter(b => b.status === 'confirmed').length;
-    const completed = filteredBookings.filter(b => b.status === 'completed').length;
-    const cancelled = filteredBookings.filter(b => b.status === 'cancelled').length;
-
-    let totalRevenue = 0;
-    filteredBookings.forEach(b => {
-      const dep = Number(b.deposit_amount || 0);
-      const total = Number(b.total_amount || 0);
-      if (b.status === 'completed') {
-        totalRevenue += total;
-      } else if (b.status === 'confirmed' || b.status === 'pending') {
-        totalRevenue += dep;
-      } else if (b.status === 'cancelled') {
-        const hasRefund = b.payments?.some(p => p.status === 'refunded');
-        if (dep > 0 && !hasRefund) {
-          totalRevenue += dep;
-        }
-      }
+  const filteredBookings = useMemo(() => {
+    return bookings.filter(b => {
+      if (!debouncedSearch) return true;
+      const term = debouncedSearch.toLowerCase().trim();
+      const custName = (b.customer?.full_name || getCustomerName(b.customer_id) || '').toLowerCase();
+      const custPhone = (b.customer?.phone || getCustomerPhone(b.customer_id) || '').toLowerCase();
+      const note = (b.note || '').toLowerCase();
+      const courtName = (b.court?.name || getCourtName(b.court_id) || '').toLowerCase();
+      const idStr = `#${b.id}`;
+      return custName.includes(term) || custPhone.includes(term) || note.includes(term) || courtName.includes(term) || idStr.includes(term) || String(b.id) === term;
     });
+  }, [bookings, debouncedSearch, customers, courts]);
 
-    return { total, confirmed, completed, cancelled, totalRevenue };
-  })();
+  const paginatedBookings = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredBookings.slice(start, start + pageSize);
+  }, [filteredBookings, currentPage, pageSize]);
 
   /* ── Table columns ────────────────────────────── */
   const columns = [
     { key: 'id', label: '#', width: '60px', render: v => <span style={{ fontWeight: 600, color: '#64748B' }}>#{v}</span> },
-    { key: 'customer_id', label: 'Khách hàng', render: (v, row) => (
-      <div>
-        <strong style={{ color: '#0F172A', fontSize: '0.92rem' }}>{row.customer?.full_name || getCustomerName(v)}</strong>
-        <div style={{ fontSize: '0.78rem', color: '#64748B' }}>{row.customer?.phone || getCustomerPhone(v)}</div>
-      </div>
-    )},
+    { key: 'customer_id', label: 'Khách hàng', render: (v, row) => {
+      const custObj = row.customer || customers.find(c => c.id === v) || { id: v, full_name: getCustomerName(v), phone: getCustomerPhone(v) };
+      const name = custObj.full_name || getCustomerName(v);
+      const phone = custObj.phone || getCustomerPhone(v);
+      return (
+        <CustomerPopover customer={custObj} customerId={v}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+            <CustomerAvatar name={name} size={34} showBadge={true} />
+            <div>
+              <strong style={{ color: '#0F172A', fontSize: '0.88rem', display: 'block' }}>{name}</strong>
+              <div style={{ fontSize: '0.75rem', color: '#64748B', fontFamily: 'monospace' }}>{phone}</div>
+            </div>
+          </div>
+        </CustomerPopover>
+      );
+    }},
     { key: 'court_id', label: 'Sân', render: (v, row) => <span style={{ color: '#1E293B', fontWeight: 600 }}>{row.court?.name || getCourtName(v)}</span> },
     { key: 'time_slot', label: 'Ngày & Giờ', render: (v) => v ? (
       <div>
@@ -400,7 +417,7 @@ export default function Bookings() {
         );
       }
     },
-    { key: 'deposit_amount', label: 'ĐẶT CỌC', align: 'right',
+    { key: 'deposit_amount', label: 'ĐẶT CỌC', align: 'right', width: '160px', padding: '12px 24px 12px 12px',
       render: (v, b) => {
         const hasRefund = b.payments?.some(p => p.status === 'refunded');
         const refundPayment = b.payments?.find(p => p.status === 'refunded');
@@ -487,7 +504,7 @@ export default function Bookings() {
         return <span style={{ color: '#94A3B8', fontSize: '0.78rem' }}>Chưa cọc</span>;
       }
     },
-    { key: 'status', label: 'Trạng thái',
+    { key: 'status', label: 'Trạng thái', width: '150px', padding: '12px 12px 12px 24px',
       render: v => <Badge status={STATUS_MAP[v]?.status || 'pending'} label={STATUS_MAP[v]?.label || v} /> },
     { key: 'actions', label: 'THAO TÁC', align: 'right',
       render: (_, b) => {
@@ -520,7 +537,7 @@ export default function Bookings() {
             {b.status === 'pending' && (
               <Button variant="ghost" size="sm" icon={<CheckCircle size={12} />}
                 style={{ color: '#15803D', borderColor: '#BBF7D0', background: '#F0FDF4', fontWeight: 600 }}
-                onClick={() => handleConfirm(b.id)}>
+                onClick={() => setConfirmBookingId(b.id)}>
                 Xác nhận
               </Button>
             )}
@@ -609,37 +626,21 @@ export default function Bookings() {
         </div>
       </Card>
 
-      {/* ── Summary Pills Bar ── */}
-      <div className="bookings-summary-bar">
-        <div className="summary-pill total">
-          <span className="summary-label">Tổng số đơn:</span>
-          <strong className="summary-value">{summaryStats.total}</strong>
-        </div>
-        <div className="summary-pill confirmed">
-          <span className="summary-dot" style={{ background: '#2563EB' }} />
-          <span className="summary-label">Sắp diễn ra (Đã đặt):</span>
-          <strong className="summary-value" style={{ color: '#2563EB' }}>{summaryStats.confirmed}</strong>
-        </div>
-        <div className="summary-pill completed">
-          <span className="summary-dot" style={{ background: '#16A34A' }} />
-          <span className="summary-label">Hoàn thành:</span>
-          <strong className="summary-value" style={{ color: '#16A34A' }}>{summaryStats.completed}</strong>
-        </div>
-        <div className="summary-pill cancelled">
-          <span className="summary-dot" style={{ background: '#DC2626' }} />
-          <span className="summary-label">Đã hủy:</span>
-          <strong className="summary-value" style={{ color: '#DC2626' }}>{summaryStats.cancelled}</strong>
-        </div>
-        <div className="summary-pill revenue">
-          <span className="summary-label">💰 Tổng thực thu:</span>
-          <strong className="summary-value revenue-val">{summaryStats.totalRevenue.toLocaleString()}đ</strong>
-        </div>
-      </div>
-
       {/* ── Table ── */}
       <Card padding="none">
-        <Table columns={columns} data={filteredBookings} loading={loading}
-          emptyText={searchTerm ? "Không tìm thấy lịch đặt phù hợp" : "Chưa có lịch đặt nào"} />
+        <Table columns={columns} data={paginatedBookings} loading={loading}
+          emptyText={debouncedSearch ? "Không tìm thấy lịch đặt phù hợp" : "Chưa có lịch đặt nào"} />
+        {filteredBookings.length > 0 && (
+          <div style={{ padding: '0.5rem 1.25rem' }}>
+            <Pagination
+              currentPage={currentPage}
+              totalItems={filteredBookings.length}
+              pageSize={pageSize}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={(newSize) => { setPageSize(newSize); setCurrentPage(1); }}
+            />
+          </div>
+        )}
       </Card>
 
       {/* ── MODAL: Đặt sân mới ── */}
@@ -1020,6 +1021,18 @@ export default function Bookings() {
           setDetailBooking(null);
           handleOpenRefund(b);
         }}
+      />
+
+      {/* ── Modal xác nhận chuẩn giao diện hiện đại ── */}
+      <ConfirmModal
+        open={!!confirmBookingId}
+        onClose={() => setConfirmBookingId(null)}
+        onConfirm={handleConfirmSubmit}
+        loading={confirmLoading}
+        title="Xác nhận đơn đặt sân"
+        message={`Bạn có chắc chắn muốn xác nhận đơn đặt sân #${confirmBookingId}?`}
+        confirmText="Xác nhận"
+        variant="primary"
       />
     </div>
   );

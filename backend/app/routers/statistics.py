@@ -170,15 +170,6 @@ def get_revenue_chart(
         return items
 
     result = calculate_revenue_series(start_date, end_date)
-    
-    # Khắc phục dữ liệu mẫu: Nếu khoảng thời gian lọc ban đầu không có doanh thu,
-    # nhưng DB thực tế có doanh thu ở các ngày khác, tự động lấy khoảng có dữ liệu để biểu đồ luôn sinh động
-    total_rev = sum(item.revenue for item in result)
-    if total_rev == 0 and not all_time:
-        has_any_revenue = db.query(Payment).filter(Payment.status == "paid").first() or db.query(Booking).filter(Booking.deposit_amount > 0).first()
-        if has_any_revenue:
-            result = calculate_revenue_series(earliest_db_date, max(latest_db_date, date.today()))
-            
     return result
 
 @router.get("/peak-hours", response_model=List[PeakHourItem])

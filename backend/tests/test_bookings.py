@@ -18,7 +18,7 @@ from datetime import date, time as dt_time
 SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL, 
-    connect_args={"check_same_thread": False},
+    connect_args={"check_same_thread": False, "timeout": 30},
     poolclass=StaticPool,
 )
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

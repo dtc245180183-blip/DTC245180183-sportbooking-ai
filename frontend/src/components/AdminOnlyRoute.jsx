@@ -13,7 +13,7 @@ export default function AdminOnlyRoute() {
   }
 
   if (user.role !== 'admin') {
-    // Redirect về home, không dùng alert() — toast sẽ được hiển thị khi cần ở component cha
+    // Redirect về trang chủ an toàn kèm xử lý phân quyền
     return <Navigate to="/" replace />;
   }
 

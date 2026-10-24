@@ -1,33 +1,57 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { customersAPI } from '../../api';
-import { Plus, Search, History, Edit, Trash2, Users, Phone, Mail } from 'lucide-react';
+import { Plus, Search, History, Edit, Trash2, Phone, Mail } from 'lucide-react';
 import { useToast } from '../../components/ui/Toast';
-import { Button, Card, Badge, Modal, Input, Table, EmptyState } from '../../components/ui';
+import { 
+  Button, 
+  Card, 
+  Badge, 
+  Modal, 
+  Input, 
+  Table, 
+  EmptyState, 
+  ConfirmModal,
+  CustomerAvatar,
+  CustomerPopover,
+  Pagination 
+} from '../../components/ui';
+import { useDebounce } from '../../utils/useDebounce';
 
 export default function Customers() {
   const { showToast } = useToast();
   const [customers, setCustomers] = useState([]);
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 300);
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({ full_name: '', phone: '', email: '', address: '' });
   const [editId, setEditId] = useState(null);
   const [phoneError, setPhoneError] = useState('');
   const [historyCustomer, setHistoryCustomer] = useState(null);
+  const [customerToDelete, setCustomerToDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
-  // Debounce search
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  // Reset to page 1 on search change
   useEffect(() => {
-    const t = setTimeout(() => fetchCustomers(search), 500);
-    return () => clearTimeout(t);
-  }, [search]);
+    setCurrentPage(1);
+    fetchCustomers(debouncedSearch);
+  }, [debouncedSearch]);
 
   const fetchCustomers = async (q = '') => {
     setLoading(true);
     try {
       const data = await customersAPI.getAll({ q });
-      setCustomers(data);
-    } catch (e) {}
-    finally { setLoading(false); }
+      setCustomers(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Lỗi tải danh sách khách hàng:', err);
+      showToast({ type: 'error', message: 'Không thể tải danh sách khách hàng' });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -48,7 +72,7 @@ export default function Customers() {
       setShowForm(false);
       setFormData({ full_name: '', phone: '', email: '', address: '' });
       setEditId(null);
-      fetchCustomers(search);
+      fetchCustomers(debouncedSearch);
     } catch (err) {
       showToast({ type: 'error', message: err.response?.data?.detail || 'Thao tác thất bại' });
     }
@@ -60,14 +84,22 @@ export default function Customers() {
     setShowForm(true);
   };
 
-  const handleDelete = async (id) => {
-    if (!confirm('Xóa khách hàng này?')) return;
+  const handleDelete = (id) => {
+    setCustomerToDelete(id);
+  };
+
+  const confirmDeleteCustomer = async () => {
+    if (!customerToDelete) return;
+    setDeleting(true);
     try {
-      await customersAPI.delete(id);
-      showToast({ type: 'success', message: 'Đã xóa khách hàng' });
-      fetchCustomers(search);
+      await customersAPI.delete(customerToDelete);
+      showToast({ type: 'success', message: 'Đã xóa khách hàng thành công' });
+      setCustomerToDelete(null);
+      fetchCustomers(debouncedSearch);
     } catch (err) {
       showToast({ type: 'error', message: err.response?.data?.detail || 'Xóa thất bại' });
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -75,7 +107,10 @@ export default function Customers() {
     try {
       const detail = await customersAPI.getOne(c.id);
       setHistoryCustomer(detail);
-    } catch (e) {}
+    } catch (err) {
+      console.error('Lỗi tải lịch sử khách hàng:', err);
+      showToast({ type: 'error', message: 'Không thể tải lịch sử khách hàng' });
+    }
   };
 
   const STATUS_MAP = {
@@ -90,14 +125,40 @@ export default function Customers() {
     totalSpent: bookings.filter(b => b.status !== 'cancelled').reduce((s, b) => s + (b.total_amount || 0), 0),
   });
 
+  // Client-side pagination
+  const paginatedCustomers = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return customers.slice(start, start + pageSize);
+  }, [customers, currentPage, pageSize]);
+
   const columns = [
-    { key: 'id',        label: '#',             width: '60px',  render: (v) => `#${v}` },
-    { key: 'full_name', label: 'Tên khách hàng', render: (v) => <strong style={{ color: '#0F172A' }}>{v}</strong> },
-    { key: 'phone',     label: 'SĐT' },
-    { key: 'email',     label: 'Email',   render: (v) => v || '—' },
-    { key: 'address',   label: 'Địa chỉ', render: (v) => v || '—' },
+    { key: 'id', label: '#', width: '60px', render: (v) => `#${v}` },
     {
-      key: 'actions', label: '', align: 'right',
+      key: 'full_name',
+      label: 'Khách hàng',
+      render: (_, row) => (
+        <CustomerPopover customer={row}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+            <CustomerAvatar name={row.full_name} size={36} showBadge={true} />
+            <div>
+              <strong style={{ color: '#0F172A', display: 'block', fontSize: '0.88rem' }}>
+                {row.full_name}
+              </strong>
+              <span style={{ fontSize: '0.75rem', color: '#64748B' }}>
+                ID: #{row.id}
+              </span>
+            </div>
+          </div>
+        </CustomerPopover>
+      ),
+    },
+    { key: 'phone', label: 'Số điện thoại', render: (v) => <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{v}</span> },
+    { key: 'email', label: 'Email', render: (v) => v || '—' },
+    { key: 'address', label: 'Địa chỉ', render: (v) => v || '—' },
+    {
+      key: 'actions',
+      label: '',
+      align: 'right',
       render: (_, row) => (
         <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
           <Button variant="secondary" size="sm" icon={<History size={13} />} onClick={() => handleViewHistory(row)}>Lịch sử</Button>
@@ -113,7 +174,7 @@ export default function Customers() {
       <div className="page-header">
         <div>
           <h1 className="page-title">Quản lý Khách hàng</h1>
-          <p className="page-subtitle">Thông tin và lịch sử đặt sân của khách</p>
+          <p className="page-subtitle">Thông tin chi tiết, phân loại thẻ khách và lịch sử đặt sân</p>
         </div>
         <Button variant="primary" icon={<Plus size={15} />} onClick={() => { setEditId(null); setFormData({ full_name: '', phone: '', email: '', address: '' }); setShowForm(p => !p); }}>
           Thêm khách hàng
@@ -130,7 +191,7 @@ export default function Customers() {
         display: 'flex',
         alignItems: 'center',
         gap: '0.875rem',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
       }}>
         <Search size={18} style={{ color: '#059669', flexShrink: 0 }} />
         <div style={{ flex: 1 }}>
@@ -145,21 +206,53 @@ export default function Customers() {
             }}
           />
           <p style={{ margin: 0, fontSize: '0.72rem', color: '#64748B' }}>
-            {customers.length > 0 ? `${customers.length} khách hàng` : 'Nhập để tìm kiếm'}
-            {search && ` · Tìm kiếm: "${search}"`}
+            {customers.length > 0 ? `${customers.length} khách hàng trong hệ thống` : 'Nhập để tìm kiếm'}
+            {debouncedSearch && ` · Lọc theo: "${debouncedSearch}"`}
           </p>
         </div>
         {search && (
-          <button onClick={() => setSearch('')}
-            style={{ background: 'none', border: 'none', color: '#64748B', cursor: 'pointer', fontSize: '1.1rem' }}>
+          <button 
+            type="button"
+            onClick={() => setSearch('')}
+            style={{ background: 'none', border: 'none', color: '#64748B', cursor: 'pointer', fontSize: '1.1rem' }}
+          >
             ✕
           </button>
         )}
       </div>
 
       <Card padding="none">
-        <Table columns={columns} data={customers} loading={loading}
-          emptyText="Không tìm thấy khách hàng nào" />
+        {customers.length === 0 && !loading ? (
+          <EmptyState
+            title="Chưa có khách hàng"
+            description={debouncedSearch ? `Không tìm thấy khách hàng nào khớp với "${debouncedSearch}"` : "Bắt đầu thêm hồ sơ khách hàng mới để quản lý đặt sân và tích lũy chi tiêu."}
+            action={{
+              label: 'Thêm khách hàng mới',
+              icon: <Plus size={14} />,
+              onClick: () => { setEditId(null); setFormData({ full_name: '', phone: '', email: '', address: '' }); setShowForm(true); }
+            }}
+          />
+        ) : (
+          <>
+            <Table 
+              columns={columns} 
+              data={paginatedCustomers} 
+              loading={loading}
+              emptyText="Không tìm thấy khách hàng nào" 
+            />
+            {customers.length > 0 && (
+              <div style={{ padding: '0.5rem 1.25rem' }}>
+                <Pagination
+                  currentPage={currentPage}
+                  totalItems={customers.length}
+                  pageSize={pageSize}
+                  onPageChange={setCurrentPage}
+                  onPageSizeChange={(newSize) => { setPageSize(newSize); setCurrentPage(1); }}
+                />
+              </div>
+            )}
+          </>
+        )}
       </Card>
 
       {/* ── MODAL: Form thêm/sửa ── */}
@@ -210,7 +303,7 @@ export default function Customers() {
                 </Card>
               </div>
               {historyCustomer.bookings?.length === 0
-                ? <p style={{ color: '#64748B' }}>Chưa có lịch sử đặt sân.</p>
+                ? <EmptyState title="Chưa có lịch sử đặt sân" description="Khách hàng này chưa thực hiện lượt đặt sân nào." />
                 : historyCustomer.bookings?.map(b => {
                   const st = STATUS_MAP[b.status] || STATUS_MAP.pending;
                   return (
@@ -232,6 +325,17 @@ export default function Customers() {
           );
         })()}
       </Modal>
+
+      <ConfirmModal
+        isOpen={Boolean(customerToDelete)}
+        onClose={() => setCustomerToDelete(null)}
+        onConfirm={confirmDeleteCustomer}
+        title="Xác nhận xóa khách hàng"
+        message="Bạn có chắc chắn muốn xóa khách hàng này? Hành động này không thể hoàn tác nếu khách hàng đã có lịch sử đặt sân."
+        confirmText="Xóa khách hàng"
+        confirmVariant="danger"
+        isLoading={deleting}
+      />
     </div>
   );
 }

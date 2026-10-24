@@ -108,6 +108,33 @@ export default function AISuggestModal({ isOpen, onClose, onSelectSlot }) {
 
         {/* ── Form ── */}
         <div style={{ padding: '1.5rem' }}>
+          {/* Quick Prompt Chips */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+            <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#6366F1', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Gợi ý nhanh:
+            </span>
+            <button
+              type="button"
+              onClick={() => setForm(f => ({ ...f, preferred_start_time: '17:00', preferred_end_time: '21:00' }))}
+              style={{
+                background: '#FAF5FF', border: '1px solid #E9D5FF', borderRadius: 999,
+                padding: '4px 10px', fontSize: '0.76rem', color: '#7C3AED', fontWeight: 600, cursor: 'pointer'
+              }}
+            >
+              ⚡ 3 khung giờ tối đẹp nhất (17h-21h)
+            </button>
+            <button
+              type="button"
+              onClick={() => setForm(f => ({ ...f, preferred_start_time: '06:00', preferred_end_time: '09:00' }))}
+              style={{
+                background: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: 999,
+                padding: '4px 10px', fontSize: '0.76rem', color: '#059669', fontWeight: 600, cursor: 'pointer'
+              }}
+            >
+              ⚡ Sáng sớm (6h-9h)
+            </button>
+          </div>
+
           <form onSubmit={handleSubmit}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
               <div style={{ gridColumn: '1 / -1' }}>

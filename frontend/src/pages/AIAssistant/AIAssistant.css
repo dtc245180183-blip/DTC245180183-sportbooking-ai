@@ -395,3 +395,74 @@
 .ai-alert-error p {
   margin: 0;
 }
+
+/* === Quick Prompt Chips (Section 3.6) === */
+.quick-prompts-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.quick-prompts-label {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: #6366F1;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.prompt-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  background: #FAF5FF;
+  border: 1px solid #E9D5FF;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #7C3AED;
+  cursor: pointer;
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 2px rgba(124, 58, 237, 0.04);
+}
+
+.prompt-chip:hover {
+  background: #F3E8FF;
+  border-color: #C084FC;
+  color: #6B21A8;
+  transform: translateY(-1px);
+}
+
+.prompt-chip:active, .prompt-chip.active {
+  background: #7C3AED;
+  border-color: #7C3AED;
+  color: #FFFFFF;
+}
+
+.prompt-chip-emerald {
+  background: #ECFDF5;
+  border-color: #A7F3D0;
+  color: #059669;
+}
+.prompt-chip-emerald:hover {
+  background: #D1FAE5;
+  border-color: #6EE7B7;
+  color: #047857;
+}
+
+.prompt-chip-amber {
+  background: #FFFBEB;
+  border-color: #FDE68A;
+  color: #D97706;
+}
+.prompt-chip-amber:hover {
+  background: #FEF3C7;
+  border-color: #FCD34D;
+  color: #B45309;
+}

@@ -28,6 +28,7 @@ export default function TimeSlots() {
   const [generating, setGenerating] = useState(false);
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [bulkForm, setBulkForm] = useState({
+    court_id: '',
     start_date: new Date().toISOString().slice(0, 10),
     end_date: new Date().toISOString().slice(0, 10),
     start_hour: 6, end_hour: 22, duration_minutes: 60,
@@ -61,9 +62,9 @@ export default function TimeSlots() {
 
   const handleBulkGenerate = async (e) => {
     e.preventDefault();
-    if (!selectedCourt) {
-      showToast({ type: 'warning', message: 'Vui lòng chọn sân trước (thanh lọc bên trên)' });
-      setShowBulkModal(false);
+    const courtId = bulkForm.court_id || selectedCourt;
+    if (!courtId) {
+      showToast({ type: 'warning', message: 'Vui lòng chọn sân cần sinh khung giờ' });
       return;
     }
     if (parseInt(bulkForm.start_hour) >= parseInt(bulkForm.end_hour)) {
@@ -74,7 +75,7 @@ export default function TimeSlots() {
     try {
       // Map sang đúng field names mà backend /time-slots/generate yêu cầu
       const payload = {
-        court_id:            parseInt(selectedCourt),
+        court_id:            parseInt(courtId),
         date_from:           bulkForm.start_date,
         date_to:             bulkForm.end_date,
         start_hour:          parseInt(bulkForm.start_hour),
@@ -82,11 +83,12 @@ export default function TimeSlots() {
         slot_duration_hours: bulkForm.duration_minutes / 60,  // convert phút → giờ
       };
       const result = await timeSlotsAPI.generate(payload);
-      const courtName = courts.find(c => c.id === parseInt(selectedCourt))?.name || '';
+      const courtName = courts.find(c => c.id === parseInt(courtId))?.name || '';
       showToast({
         type: 'success',
         message: `✅ ${courtName}: Tạo ${result.created_count} slot mới, bỏ qua ${result.skipped_count} slot đã tồn tại`,
       });
+      setSelectedCourt(String(courtId));
       setShowBulkModal(false);
       if (bulkForm.start_date <= selectedDate && selectedDate <= bulkForm.end_date) fetchSlots();
     } catch (err) {
@@ -110,7 +112,10 @@ export default function TimeSlots() {
           <p className="page-subtitle">Xem và quản lý các ca theo sân và ngày</p>
         </div>
         {isAdmin && (
-          <Button variant="primary" icon={<Zap size={15} />} onClick={() => setShowBulkModal(true)}>
+          <Button variant="primary" icon={<Zap size={15} />} onClick={() => {
+            setBulkForm(p => ({ ...p, court_id: selectedCourt || (courts[0]?.id ? String(courts[0].id) : '') }));
+            setShowBulkModal(true);
+          }}>
             Tạo khung giờ nhanh
           </Button>
         )}
@@ -227,37 +232,18 @@ export default function TimeSlots() {
           </>
         }
       >
-        {/* Hiển thị sân đang được chọn */}
-        {selectedCourt ? (
-          <div style={{
-            padding: '0.625rem 1rem',
-            background: '#F0FDF4',
-            border: '1px solid #DCFCE7',
-            borderRadius: 10,
-            marginBottom: '1rem',
-            fontSize: '0.85rem',
-            color: '#15803D',
-          }}>
-            Sân đang chọn: <strong style={{ color: '#0F172A' }}>
-              {courts.find(c => c.id === parseInt(selectedCourt))?.name || `Sân #${selectedCourt}`}
-            </strong>
-          </div>
-        ) : (
-          <div style={{
-            padding: '0.625rem 1rem',
-            background: '#FEF2F2',
-            border: '1px solid #FECACA',
-            borderRadius: 10,
-            marginBottom: '1rem',
-            fontSize: '0.85rem',
-            color: '#DC2626',
-          }}>
-            Chưa chọn sân. Vui lòng đóng modal và chọn sân ở thanh lọc bên trên.
-          </div>
-        )}
-
         <form id="bulk-form" onSubmit={handleBulkGenerate}
           style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          <div style={{ gridColumn: '1/-1' }}>
+            <Select
+              label="Chọn sân *"
+              required
+              value={bulkForm.court_id}
+              onChange={e => setBulkForm(p => ({ ...p, court_id: e.target.value }))}
+              options={courts.map(c => ({ value: c.id, label: `${c.name} (${c.price_per_hour?.toLocaleString('vi-VN')}đ/giờ)` }))}
+              placeholder="-- Chọn sân cần sinh khung giờ --"
+            />
+          </div>
           <Input label="Ngày bắt đầu" type="date" required
             value={bulkForm.start_date}
             onChange={e => setBulkForm(p => ({ ...p, start_date: e.target.value }))} />

@@ -209,7 +209,7 @@ export default function GenerateSlotsModal({ isOpen, onClose, courts: courtsProp
             <div>
               Sẽ sinh khung giờ từ <strong style={{ color: '#0F172A' }}>{formData.date_from}</strong> đến{' '}
               <strong style={{ color: '#0F172A' }}>{formData.date_to}</strong>, mỗi ca{' '}
-              <strong style={{ color: '#0F172A' }}>{formData.slot_duration_hours} giờ</strong>, từ{' '}
+              <strong style={{ color: '#0F172A' }}>{formData.duration_minutes} phút</strong>, từ{' '}
               <strong style={{ color: '#0F172A' }}>{formData.start_hour}:00</strong> đến{' '}
               <strong style={{ color: '#0F172A' }}>{formData.end_hour}:00</strong>
             </div>

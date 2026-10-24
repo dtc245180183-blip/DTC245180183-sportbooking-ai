@@ -17,6 +17,17 @@ import Sidebar from './components/Sidebar';
 import Topbar from './components/Topbar';
 import AIFloatingButton from './components/AIFloatingButton';
 
+import { useEffect } from 'react';
+import { useToast } from './components/ui/Toast';
+
+const UnauthorizedRedirect = () => {
+  const { showToast } = useToast();
+  useEffect(() => {
+    showToast({ type: 'warning', message: 'Bạn không có quyền truy cập trang này' });
+  }, [showToast]);
+  return <Navigate to="/" replace />;
+};
+
 const ProtectedRoute = ({ children, adminOnly = false, staffOnly = false }) => {
   const { user, loading } = useAuth();
 
@@ -25,9 +36,9 @@ const ProtectedRoute = ({ children, adminOnly = false, staffOnly = false }) => {
       Đang tải...
     </div>
   );
-  if (!user) return <Navigate to="/login" />;
-  if (adminOnly && user.role !== 'admin') return <Navigate to="/" />;
-  if (staffOnly && user.role === 'admin') return <Navigate to="/" />;
+  if (!user) return <Navigate to="/login" replace />;
+  if (adminOnly && user.role !== 'admin') return <UnauthorizedRedirect />;
+  if (staffOnly && user.role !== 'staff') return <UnauthorizedRedirect />;
 
   return (
     <div className="app-container">

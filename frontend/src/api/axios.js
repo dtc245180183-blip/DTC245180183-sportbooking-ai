@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: '', // Dùng đường dẫn tương đối để đi qua Proxy (Vite server.proxy / Nginx reverse proxy)
+  baseURL: import.meta.env.VITE_API_URL || '', // Dùng đường dẫn tương đối để đi qua Proxy hoặc env VITE_API_URL
   headers: { 'Content-Type': 'application/json' },
 });
 

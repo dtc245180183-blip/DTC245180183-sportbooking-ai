@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { statisticsAPI, bookingsAPI, customersAPI } from '../../api';
 import {
@@ -31,10 +31,54 @@ function CustomTooltip({ active, payload, label, formatter }) {
   );
 }
 
+/* ── KPI Sparkline (Pure SVG, zero layout shift) ─ */
+function MiniSparkline({ data, color = '#10B981' }) {
+  if (!data || data.length < 2) return null;
+  const values = data.map(d => Number(d.value || 0));
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const width = 84;
+  const height = 28;
+
+  const points = values.map((v, i) => {
+    const x = (i / (values.length - 1)) * width;
+    const y = height - ((v - min) / range) * (height - 6) - 3;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+
+  const pathD = `M ${points.join(' L ')}`;
+  const areaD = `M 0,${height} L ${points.join(' L ')} L ${width},${height} Z`;
+  const gradId = `spark-${color.replace(/[^a-zA-Z0-9]/g, '')}`;
+
+  return (
+    <div style={{ width, height, overflow: 'hidden', marginLeft: 'auto', flexShrink: 0 }} title="Xu hướng chuỗi thời gian">
+      <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
+        <defs>
+          <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity={0.25} />
+            <stop offset="100%" stopColor={color} stopOpacity={0.0} />
+          </linearGradient>
+        </defs>
+        <path d={areaD} fill={`url(#${gradId})`} />
+        <path d={pathD} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </div>
+  );
+}
+
 /* ── Format money accurately ────────────────────── */
 const formatMoney = (amount) => {
   if (amount == null) return '—';
   return `${Number(amount).toLocaleString('en-US')} đ`;
+};
+
+/* ── Format local date YYYY-MM-DD ────────────────── */
+const formatLocalDate = (d) => {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 };
 
 /* ── Main Dashboard ──────────────────────────────── */
@@ -44,18 +88,40 @@ export default function Dashboard() {
 
   const [overview, setOverview]         = useState(null);
   const [revenue, setRevenue]           = useState([]);
+  const [allRevenue, setAllRevenue]     = useState([]);
   const [peakHours, setPeakHours]       = useState([]);
   const [courtOcc, setCourtOcc]         = useState([]);
   const [chartDays, setChartDays]       = useState('all'); // 'all' | 7 | 14 | 30
   const [recentBookings, setRecentBookings] = useState([]);
   const [customerCount, setCustomerCount]   = useState(0);
   const [loading, setLoading]           = useState(true);
+  const [chartLoading, setChartLoading] = useState(false);
 
-  useEffect(() => {
-    fetchStats();
-  }, [chartDays, isAdmin]);
+  const fetchRevenue = useCallback(async (days) => {
+    if (!isAdmin) return;
+    setChartLoading(true);
+    try {
+      let rev;
+      if (days === 'all') {
+        rev = await statisticsAPI.getRevenueChart({ all_time: true });
+        setAllRevenue(rev);
+      } else {
+        const daysNum = parseInt(days, 10);
+        const now = new Date();
+        const to_date = formatLocalDate(now);
+        const fromDateObj = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (daysNum - 1));
+        const from_date = formatLocalDate(fromDateObj);
+        rev = await statisticsAPI.getRevenueChart({ from_date, to_date });
+      }
+      setRevenue(Array.isArray(rev) ? rev : []);
+    } catch (e) {
+      console.error('Failed to load revenue chart data', e);
+    } finally {
+      setChartLoading(false);
+    }
+  }, [isAdmin]);
 
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     setLoading(true);
     try {
       // 1. Fetch overview (áp dụng cho cả admin và staff)
@@ -68,8 +134,10 @@ export default function Dashboard() {
           revPromise = statisticsAPI.getRevenueChart({ all_time: true });
         } else {
           const daysNum = parseInt(chartDays, 10);
-          const to_date = new Date().toISOString().slice(0, 10);
-          const from_date = new Date(Date.now() - (daysNum - 1) * 86400000).toISOString().slice(0, 10);
+          const now = new Date();
+          const to_date = formatLocalDate(now);
+          const fromDateObj = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (daysNum - 1));
+          const from_date = formatLocalDate(fromDateObj);
           revPromise = statisticsAPI.getRevenueChart({ from_date, to_date });
         }
 
@@ -81,9 +149,15 @@ export default function Dashboard() {
         ]);
 
         setOverview(ov);
-        setRevenue(rev);
-        setPeakHours(peak);
-        setCourtOcc(occ);
+        const safeRev = Array.isArray(rev) ? rev : [];
+        setRevenue(safeRev);
+        if (chartDays === 'all') {
+          setAllRevenue(safeRev);
+        } else {
+          statisticsAPI.getRevenueChart({ all_time: true }).then(r => setAllRevenue(Array.isArray(r) ? r : [])).catch(() => {});
+        }
+        setPeakHours(Array.isArray(peak) ? peak : []);
+        setCourtOcc(Array.isArray(occ) ? occ : []);
       } else {
         // Staff: Không gọi API doanh thu/báo cáo chuyên sâu, chỉ tải danh sách tác nghiệp và khách hàng
         const [ov, bookingsRes, custRes] = await Promise.all([
@@ -105,6 +179,16 @@ export default function Dashboard() {
     } finally {
       setLoading(false);
     }
+  }, [isAdmin, chartDays]);
+
+  useEffect(() => {
+    fetchStats();
+  }, [fetchStats]);
+
+  const handleChartDaysChange = (e) => {
+    const val = e.target.value;
+    setChartDays(val);
+    fetchRevenue(val);
   };
 
   /* ── Peak hours list for Admin ── */
@@ -130,14 +214,16 @@ export default function Dashboard() {
       sub: 'Toàn bộ thời gian',
       color: '#059669',
       bg: '#DCFCE7',
+      sparklineData: (allRevenue.length > 0 ? allRevenue : revenue).map(r => ({ value: r.revenue })),
     },
     {
       icon: TrendingUp,
-      label: 'Doanh thu hôm nay',
+      label: 'Doanh thu gần đây',
       value: overview ? formatMoney(overview.today_revenue) : '—',
       sub: new Date().toLocaleDateString('vi-VN'),
       color: '#2563EB',
       bg: '#DBEAFE',
+      sparklineData: (allRevenue.length > 0 ? allRevenue : revenue).slice(-7).map(r => ({ value: r.revenue })),
     },
     {
       icon: Activity,
@@ -146,6 +232,7 @@ export default function Dashboard() {
       sub: 'Toàn bộ thời gian',
       color: '#D97706',
       bg: '#FEF3C7',
+      sparklineData: courtOcc.map(c => ({ value: c.occupancy_rate })),
     },
     {
       icon: Calendar,
@@ -154,6 +241,7 @@ export default function Dashboard() {
       sub: `Công suất: ${overview?.today_occupancy_rate ?? 0}%`,
       color: '#7C3AED',
       bg: '#F3E8FF',
+      sparklineData: peakHours.map(p => ({ value: p.booked_slots })),
     },
   ];
 
@@ -166,6 +254,7 @@ export default function Dashboard() {
       sub: 'Tất cả các sân',
       color: '#2563EB',
       bg: '#DBEAFE',
+      sparklineData: recentBookings.slice(0, 7).reverse().map(b => ({ value: b.total_amount || 1 })),
     },
     {
       icon: Building2,
@@ -301,7 +390,11 @@ export default function Dashboard() {
                 <p className="kpi-value" style={{ color: card.color }}>{card.value}</p>
                 <p className="kpi-sub">{card.sub}</p>
               </div>
-              <ArrowUpRight size={17} className="kpi-arrow" style={{ color: card.color }} />
+              {card.sparklineData && card.sparklineData.length >= 2 ? (
+                <MiniSparkline data={card.sparklineData} color={card.color} />
+              ) : (
+                <ArrowUpRight size={17} className="kpi-arrow" style={{ color: card.color }} />
+              )}
             </div>
           ))}
       </div>
@@ -323,7 +416,7 @@ export default function Dashboard() {
                 </div>
                 <select
                   style={{ background: '#FFFFFF', border: '1px solid #CBD5E1', borderRadius: 8, color: '#0F172A', padding: '6px 10px', fontSize: '0.8rem', cursor: 'pointer', outline: 'none' }}
-                  value={chartDays} onChange={e => setChartDays(e.target.value)}
+                  value={chartDays} onChange={handleChartDaysChange}
                 >
                   <option value="all">Toàn thời gian (Tất cả)</option>
                   <option value="7">7 ngày qua</option>
@@ -331,7 +424,7 @@ export default function Dashboard() {
                   <option value="30">30 ngày qua</option>
                 </select>
               </div>
-              {loading ? (
+              {chartLoading || loading ? (
                 <Skeleton height="180px" variant="rect" style={{ borderRadius: 12 }} />
               ) : revenue.length > 0 ? (
                 <ResponsiveContainer width="100%" height={180}>

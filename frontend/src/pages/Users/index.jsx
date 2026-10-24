@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { usersAPI, authAPI } from '../../api';
 import { Shield, Plus, UserCog, UserMinus, Users as UsersIcon } from 'lucide-react';
 import { useToast } from '../../components/ui/Toast';
-import { Button, Card, Badge, Modal, Input, Select, Table } from '../../components/ui';
+import { Button, Card, Badge, Modal, Input, Select, Table, ConfirmModal } from '../../components/ui';
 import './Users.css';
 
 export default function Users() {
@@ -12,6 +12,8 @@ export default function Users() {
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({ username: '', full_name: '', role: 'staff', password: '' });
   const [editId, setEditId] = useState(null);
+  const [userToDelete, setUserToDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => { fetchUsers(); }, []);
 
@@ -51,14 +53,22 @@ export default function Users() {
     setShowForm(true);
   };
 
-  const handleDelete = async (id) => {
-    if (!confirm('Xóa nhân viên này?')) return;
+  const handleDelete = (id) => {
+    setUserToDelete(id);
+  };
+
+  const confirmDeleteUser = async () => {
+    if (!userToDelete) return;
+    setDeleting(true);
     try {
-      await usersAPI.delete(id);
-      showToast({ type: 'success', message: 'Đã xóa nhân viên' });
+      await usersAPI.delete(userToDelete);
+      showToast({ type: 'success', message: 'Đã xóa nhân viên thành công' });
+      setUserToDelete(null);
       fetchUsers();
     } catch (err) {
       showToast({ type: 'error', message: err.response?.data?.detail || 'Xóa thất bại' });
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -158,6 +168,17 @@ export default function Users() {
           />
         </form>
       </Modal>
+
+      <ConfirmModal
+        isOpen={Boolean(userToDelete)}
+        onClose={() => setUserToDelete(null)}
+        onConfirm={confirmDeleteUser}
+        title="Xác nhận xóa nhân viên"
+        message="Bạn có chắc chắn muốn xóa tài khoản nhân viên này không? Hành động này không thể hoàn tác."
+        confirmText="Xóa nhân viên"
+        confirmVariant="danger"
+        isLoading={deleting}
+      />
     </div>
   );
 }

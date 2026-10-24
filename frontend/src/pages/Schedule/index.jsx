@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
   Calendar, 
   Sparkles, 
@@ -8,8 +8,11 @@ import {
   CalendarDays, 
   Plus, 
   Wrench, 
-  UserCheck, 
-  Flame 
+  Flame,
+  LayoutGrid,
+  Trophy,
+  Activity,
+  CircleDot
 } from 'lucide-react';
 import { courtsAPI, courtTypesAPI, timeSlotsAPI, maintenanceAPI, bookingsAPI } from '../../api';
 import QuickBookModal from './QuickBookModal';
@@ -18,6 +21,7 @@ import AISuggestModal from './AISuggestModal';
 import GenerateSlotsModal from './GenerateSlotsModal';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../components/ui/Toast';
+import { ConfirmModal, CustomerAvatar } from '../../components/ui';
 import { getSportImage, getSportAccent } from '../../utils/sportImages';
 import './Schedule.css';
 
@@ -33,6 +37,7 @@ export default function Schedule() {
   const [maintenanceList, setMaintenanceList] = useState([]);
   const [dayBookings, setDayBookings] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedSport, setSelectedSport] = useState('all');
 
   // Modals state
   const [selectedSlot, setSelectedSlot] = useState(null);
@@ -41,14 +46,12 @@ export default function Schedule() {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isAIOpen, setIsAIOpen] = useState(false);
   const [isGenerateOpen, setIsGenerateOpen] = useState(false);
+  const [toggleSlotModal, setToggleSlotModal] = useState({ open: false, slot: null, isLocking: false });
+  const [toggleLoading, setToggleLoading] = useState(false);
 
   const hours = Array.from({ length: 17 }, (_, i) => i + 6); // 6:00 to 22:00
 
-  useEffect(() => {
-    fetchData();
-  }, [selectedDate]);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const [courtsData, typesData, slotsData, maintenanceData, bookingsData] = await Promise.all([
@@ -69,9 +72,29 @@ export default function Schedule() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedDate, showToast]);
 
-  const getCourtTypeName = (courtTypeId) => courtTypes.find(t => t.id === courtTypeId)?.name || '';
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  const getCourtTypeName = useCallback((courtTypeId) => {
+    return courtTypes.find(t => t.id === courtTypeId)?.name || '';
+  }, [courtTypes]);
+
+  // Bộ lọc Sport Pills
+  const filteredCourts = useMemo(() => {
+    if (!selectedSport || selectedSport === 'all') return courts;
+    return courts.filter(c => {
+      const type = (getCourtTypeName(c.court_type_id) || '').toLowerCase();
+      const name = (c.name || '').toLowerCase();
+      const combined = `${type} ${name}`;
+      if (selectedSport === 'football') return combined.includes('bóng đá') || combined.includes('football');
+      if (selectedSport === 'badminton') return combined.includes('cầu lông') || combined.includes('badminton');
+      if (selectedSport === 'pickleball') return combined.includes('pickleball');
+      return true;
+    });
+  }, [courts, selectedSport, getCourtTypeName]);
 
   const isCourtInMaintenance = (court) => {
     if (!court) return false;
@@ -173,33 +196,35 @@ export default function Schedule() {
     
     if (slot.status === 'available') {
       if (isAdmin) {
-        // Admin: confirm xem có muốn khóa không, không thì mở QuickBook
-        if (window.confirm("Khóa khung giờ này thủ công?\n(Bấm OK = Khóa | Cancel = Tạo lịch đặt)")) {
-          try {
-            await timeSlotsAPI.toggleBlock(slot.id);
-            fetchData();
-          } catch(e) {
-            showToast({ type: 'error', message: e.response?.data?.detail || 'Lỗi khi khóa' });
-          }
-        } else {
-          setIsQuickBookOpen(true);
-        }
+        // Admin: mở modal hỏi xác nhận khóa hay đặt sân
+        setToggleSlotModal({ open: true, slot, isLocking: true });
       } else {
         setIsQuickBookOpen(true);
       }
     } else if (slot.status === 'blocked') {
       if (isAdmin) {
-        if (window.confirm('Khung giờ đang bị khóa thủ công. Mở lại không?')) {
-          try {
-            await timeSlotsAPI.toggleBlock(slot.id);
-            fetchData();
-          } catch(e) {
-            showToast({ type: 'error', message: e.response?.data?.detail || 'Lỗi khi mở' });
-          }
-        }
+        setToggleSlotModal({ open: true, slot, isLocking: false });
       } else {
         showToast({ type: 'info', message: 'Khung giờ này đang bị khóa.' });
       }
+    }
+  };
+
+  const handleConfirmToggleSlot = async () => {
+    if (!toggleSlotModal.slot) return;
+    setToggleLoading(true);
+    try {
+      await timeSlotsAPI.toggleBlock(toggleSlotModal.slot.id);
+      showToast({
+        type: 'success',
+        message: toggleSlotModal.isLocking ? 'Đã khóa khung giờ thành công' : 'Đã mở khóa khung giờ thành công'
+      });
+      setToggleSlotModal({ open: false, slot: null, isLocking: false });
+      fetchData();
+    } catch(e) {
+      showToast({ type: 'error', message: e.response?.data?.detail || 'Thao tác thất bại' });
+    } finally {
+      setToggleLoading(false);
     }
   };
 
@@ -299,6 +324,31 @@ export default function Schedule() {
         </div>
       </div>
 
+      {/* Sport Pills Filter */}
+      <div className="schedule-sport-pills">
+        {[
+          { id: 'all', label: 'Tất cả sân', icon: LayoutGrid, count: courts.length },
+          { id: 'pickleball', label: 'Pickleball', icon: Trophy, count: courts.filter(c => (getCourtTypeName(c.court_type_id) + c.name).toLowerCase().includes('pickleball')).length },
+          { id: 'badminton', label: 'Cầu lông', icon: Activity, count: courts.filter(c => (getCourtTypeName(c.court_type_id) + c.name).toLowerCase().includes('cầu lông') || (getCourtTypeName(c.court_type_id) + c.name).toLowerCase().includes('badminton')).length },
+          { id: 'football', label: 'Bóng đá', icon: CircleDot, count: courts.filter(c => (getCourtTypeName(c.court_type_id) + c.name).toLowerCase().includes('bóng đá') || (getCourtTypeName(c.court_type_id) + c.name).toLowerCase().includes('football')).length },
+        ].filter(p => p.id === 'all' || p.count > 0).map(pill => {
+          const Icon = pill.icon;
+          const isActive = selectedSport === pill.id;
+          return (
+            <button
+              key={pill.id}
+              type="button"
+              className={`sport-pill-btn ${isActive ? 'active' : ''}`}
+              onClick={() => setSelectedSport(pill.id)}
+            >
+              <Icon size={14} />
+              <span>{pill.label}</span>
+              <span className="sport-pill-count">{pill.count}</span>
+            </button>
+          );
+        })}
+      </div>
+
       {/* Legend Bar (Chú thích nhanh) */}
       <div className="schedule-legend-bar">
         <div className="legend-item">
@@ -333,14 +383,14 @@ export default function Schedule() {
           <div className="calendar-scroll-area">
             <div 
               className="calendar-grid" 
-              style={{ gridTemplateColumns: `88px repeat(${courts.length || 1}, minmax(160px, 1fr))` }}
+              style={{ gridTemplateColumns: `88px repeat(${filteredCourts.length || 1}, minmax(160px, 1fr))` }}
             >
               {/* 2. Header row các cột Sân */}
               <div className="calendar-header-row" style={{ gridColumn: '1 / -1', gridTemplateColumns: 'subgrid' }}>
                 <div className="calendar-corner-label">
                   Giờ / Sân
                 </div>
-                {courts.map(court => {
+                {filteredCourts.map(court => {
                   const typeName = getCourtTypeName(court.court_type_id);
                   const imgSrc = getSportImage(typeName || court.name, court.image_url);
                   const inMaintenance = isCourtInMaintenance(court);
@@ -418,7 +468,7 @@ export default function Schedule() {
                     </div>
                     
                     {/* Các ô sân */}
-                    {courts.map(court => {
+                    {filteredCourts.map(court => {
                       const slot = getSlotForCourtAndHour(court.id, hour);
                       const underMaintenance = isCourtInMaintenance(court);
                       const isBooked = slot && slot.status === 'booked';
@@ -449,7 +499,7 @@ export default function Schedule() {
                                 <span className="slot-booked-status-dot"></span>
                               </div>
                               <div className="slot-booked-customer">
-                                <UserCheck size={13} className="slot-booked-icon" />
+                                <CustomerAvatar name={booking?.customer?.full_name || 'Khách'} size={20} />
                                 <span className="slot-customer-name">
                                   {booking?.customer?.full_name ? getCustomerShortName(booking.customer.full_name) : 'Khách đặt'}
                                 </span>
@@ -539,6 +589,22 @@ export default function Schedule() {
         onClose={() => setIsGenerateOpen(false)}
         courts={courts}
         onSuccess={fetchData}
+      />
+
+      {/* Modal xác nhận khóa / mở khóa khung giờ */}
+      <ConfirmModal
+        open={toggleSlotModal.open}
+        onClose={() => setToggleSlotModal({ open: false, slot: null, isLocking: false })}
+        onConfirm={handleConfirmToggleSlot}
+        loading={toggleLoading}
+        title={toggleSlotModal.isLocking ? "Khóa khung giờ thủ công" : "Mở khóa khung giờ"}
+        message={
+          toggleSlotModal.isLocking
+            ? `Bạn có chắc chắn muốn khóa khung giờ ${toggleSlotModal.slot?.start_time?.slice(0,5)} - ${toggleSlotModal.slot?.end_time?.slice(0,5)} của sân này? Khách hàng sẽ không thể đặt khung giờ này.`
+            : `Khung giờ ${toggleSlotModal.slot?.start_time?.slice(0,5)} - ${toggleSlotModal.slot?.end_time?.slice(0,5)} đang bị khóa. Bạn có muốn mở khóa lại để phục vụ khách không?`
+        }
+        confirmText={toggleSlotModal.isLocking ? "Khóa khung giờ" : "Mở khóa"}
+        variant={toggleSlotModal.isLocking ? "warning" : "primary"}
       />
     </div>
   );

@@ -245,6 +245,35 @@ export default function AIAssistant() {
 
           {/* Controls */}
           <div className="ai-controls-box">
+            {/* Quick Prompt Chips */}
+            <div className="quick-prompts-bar">
+              <span className="quick-prompts-label">Gợi ý tác vụ:</span>
+              <button
+                type="button"
+                className="prompt-chip prompt-chip-amber"
+                onClick={() => applyPreset(14)}
+                title="Tự động chọn 14 ngày qua để AI tóm tắt công suất và giờ thấp điểm"
+              >
+                ⚡ Tóm tắt công suất &amp; giờ thấp điểm (14 ngày)
+              </button>
+              <button
+                type="button"
+                className="prompt-chip prompt-chip-amber"
+                onClick={() => applyPreset(30)}
+                title="Tự động chọn 30 ngày qua để phân tích toàn diện"
+              >
+                ⚡ Đề xuất khuyến mại kích cầu (30 ngày)
+              </button>
+              <button
+                type="button"
+                className="prompt-chip prompt-chip-amber"
+                onClick={() => applyPreset(7)}
+                title="Đánh giá hiệu suất 7 ngày gần nhất"
+              >
+                ⚡ Báo cáo nhanh tuần qua (7 ngày)
+              </button>
+            </div>
+
             <div className="ai-presets-row">
               <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#475569' }}>Khoảng thời gian:</span>
               <div style={{ display: 'flex', gap: '0.4rem' }}>
@@ -381,6 +410,22 @@ export default function AIAssistant() {
                   </div>
                 </div>
               )}
+
+              {/* Standardized Disclaimer */}
+              <div style={{
+                marginTop: '1.25rem',
+                padding: '0.625rem 1rem',
+                background: '#FFFBEB',
+                border: '1px solid #FDE68A',
+                borderRadius: 8,
+                fontSize: '0.8rem',
+                color: '#B45309',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6
+              }}>
+                <span>⚠️ Kết quả AI chỉ mang tính tham khảo. Vui lòng kiểm tra tính chính xác và xác nhận trước khi sử dụng hoặc thực hiện hành động liên quan đến khách hàng.</span>
+              </div>
             </div>
           )}
         </Card>
@@ -460,8 +505,37 @@ export default function AIAssistant() {
               </div>
             </div>
 
+            {/* Quick Prompt Chips */}
+            <div className="quick-prompts-bar" style={{ marginTop: '1rem', marginBottom: '0.75rem' }}>
+              <span className="quick-prompts-label">Gợi ý tác vụ:</span>
+              <button
+                type="button"
+                className="prompt-chip prompt-chip-emerald"
+                onClick={() => setSuggestForm(p => ({ ...p, preferred_date: todayStr, preferred_start_time: '17:00', preferred_end_time: '21:00' }))}
+                title="Tự động điền khung giờ cao điểm buổi tối hôm nay"
+              >
+                ⚡ Gợi ý 3 khung giờ trống đẹp nhất (17h-21h)
+              </button>
+              <button
+                type="button"
+                className="prompt-chip prompt-chip-emerald"
+                onClick={() => setSuggestForm(p => ({ ...p, preferred_start_time: '06:00', preferred_end_time: '09:00' }))}
+                title="Tự động điền khung giờ sáng sớm"
+              >
+                ⚡ Khung giờ sáng sớm (6h-9h)
+              </button>
+              <button
+                type="button"
+                className="prompt-chip prompt-chip-emerald"
+                onClick={() => setSuggestForm(p => ({ ...p, preferred_start_time: '15:00', preferred_end_time: '18:00' }))}
+                title="Tự động điền khung giờ chiều"
+              >
+                ⚡ Khung giờ chiều (15h-18h)
+              </button>
+            </div>
+
             {/* Form */}
-            <form onSubmit={handleSuggestSlots} style={{ marginTop: '1.25rem' }}>
+            <form onSubmit={handleSuggestSlots} style={{ marginTop: '0.5rem' }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
                 <div>
                   <label style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#475569', display: 'block', marginBottom: 6 }}>
@@ -601,6 +675,22 @@ export default function AIAssistant() {
                     </div>
                   </div>
                 )}
+
+                {/* Standardized Disclaimer */}
+                <div style={{
+                  marginTop: '1rem',
+                  padding: '0.625rem 1rem',
+                  background: '#FFFBEB',
+                  border: '1px solid #FDE68A',
+                  borderRadius: 8,
+                  fontSize: '0.8rem',
+                  color: '#B45309',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6
+                }}>
+                  <span>⚠️ Kết quả AI chỉ mang tính tham khảo. Vui lòng kiểm tra tính chính xác và xác nhận trước khi sử dụng hoặc thực hiện hành động liên quan đến khách hàng.</span>
+                </div>
               </div>
             )}
           </Card>
@@ -626,6 +716,27 @@ export default function AIAssistant() {
                   Nhập mã đơn đặt (Booking ID) để Gemini AI tự động trích xuất thông tin khách hàng, sân, ngày giờ, số tiền cọc &amp; số tiền còn lại và biên soạn tin nhắn lịch sự, chuẩn mực sẵn sàng gửi qua Zalo hoặc SMS.
                 </p>
               </div>
+            </div>
+
+            {/* Quick Prompt Chips */}
+            <div className="quick-prompts-bar" style={{ marginTop: '1rem', marginBottom: '0.5rem' }}>
+              <span className="quick-prompts-label">Gợi ý tác vụ:</span>
+              <button
+                type="button"
+                className={`prompt-chip ${msgType === 'reminder' ? 'active' : ''}`}
+                onClick={() => setMsgType('reminder')}
+                title="Chuyển mục đích sang tin nhắn nhắc lịch"
+              >
+                ⚡ Soạn tin nhắc lịch cho khách
+              </button>
+              <button
+                type="button"
+                className={`prompt-chip ${msgType === 'confirmation' ? 'active' : ''}`}
+                onClick={() => setMsgType('confirmation')}
+                title="Chuyển mục đích sang tin nhắn xác nhận cọc"
+              >
+                ⚡ Soạn tin xác nhận đặt sân &amp; tiền cọc
+              </button>
             </div>
 
             {/* Quick booking selector buttons */}
@@ -724,6 +835,22 @@ export default function AIAssistant() {
                   <Link to="/bookings" style={{ fontSize: '0.78rem', color: '#4F46E5', textDecoration: 'none', fontWeight: 600 }}>
                     Xem đơn tại Danh sách đặt →
                   </Link>
+                </div>
+
+                {/* Standardized Disclaimer */}
+                <div style={{
+                  marginTop: '0.75rem',
+                  padding: '0.5rem 0.85rem',
+                  background: '#FFFBEB',
+                  border: '1px solid #FDE68A',
+                  borderRadius: 8,
+                  fontSize: '0.78rem',
+                  color: '#B45309',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6
+                }}>
+                  <span>⚠️ Kết quả AI chỉ mang tính tham khảo. Vui lòng kiểm tra tính chính xác và xác nhận trước khi sử dụng hoặc thực hiện hành động liên quan đến khách hàng.</span>
                 </div>
               </div>
             )}
