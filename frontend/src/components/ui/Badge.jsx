@@ -45,6 +45,7 @@ export default function Badge({
 
   return (
     <span
+      className={className}
       style={{
         display: 'inline-flex',
         alignItems: 'center',

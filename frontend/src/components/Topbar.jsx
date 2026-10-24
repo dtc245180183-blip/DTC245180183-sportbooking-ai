@@ -66,7 +66,7 @@ export default function Topbar() {
         <div className="topbar-greeting">
           <span className="greeting-text">{getGreetingVN(now)}, <strong>{user?.full_name?.split(' ').pop()}</strong> 👋</span>
         </div>
-        <button className="topbar-icon-btn" title="Thông báo">
+        <button className="topbar-icon-btn" title="Thông báo" aria-label="Thông báo">
           <Bell size={18} />
           <span className="notif-dot" />
         </button>
@@ -74,7 +74,7 @@ export default function Topbar() {
           background: user?.role === 'admin'
             ? 'linear-gradient(135deg, #f97316, #ef4444)'
             : 'linear-gradient(135deg, #3b82f6, #6366f1)'
-        }}>
+        }} title={user?.full_name || 'Tài khoản'}>
           {user?.full_name?.[0]?.toUpperCase() || 'U'}
         </div>
       </div>

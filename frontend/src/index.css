@@ -6,6 +6,8 @@
    ===================================================== */
 @theme {
   /* === Background layers === */
+  --color-background:    #F8FAFC;
+  --color-surface:       #FFFFFF;
   --color-bg-primary:    #F8FAFC;
   --color-bg-secondary:  #FFFFFF;
   --color-bg-surface:    #FFFFFF;
@@ -15,27 +17,34 @@
   --color-text-secondary: #475569;
   --color-text-muted:     #64748B;
 
-  /* === Brand === */
-  --color-brand-teal:  #10B981;
-  --color-brand-blue:  #3B82F6;
+  /* === Primary Brand (Sport Emerald) === */
+  --color-primary:       #10B981;
+  --color-primary-hover: #059669;
+  --color-brand-teal:    #10B981;
+  --color-brand-blue:    #3B82F6;
 
-  /* === Status === */
+  /* === Status & Booking states === */
   --color-success:  #16A34A;
-  --color-warning:  #D97706;
-  --color-danger:   #DC2626;
+  --color-warning:  #F59E0B;
+  --color-danger:   #F43F5E;
   --color-neutral:  #64748B;
 
-  /* === AI accent === */
+  /* === AI Purple accent === */
+  --color-ai:        #8B5CF6;
+  --color-ai-hover:  #7C3AED;
   --color-ai-accent: #6366F1;
 
-  /* === Border === */
+  /* === Border & Ring === */
   --color-border:    #E2E8F0;
+  --color-ring:      rgba(16, 185, 129, 0.35);
 
   /* === Border radius === */
+  --radius-xs: 4px;
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
   --radius-xl: 20px;
+  --radius-full: 9999px;
 
   /* === Font === */
   --font-main:    'Inter', 'Outfit', sans-serif;
@@ -98,10 +107,20 @@
   --radius-sm: 8px;
   --radius:    12px;
   --radius-lg: 16px;
-  --radius-xl: 20px;
+  /* === Shadows === */
+  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.04);
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
+
+  /* === Focus rings === */
+  --focus-ring:    0 0 0 3px rgba(16, 185, 129, 0.2);
+  --focus-ring-ai: 0 0 0 3px rgba(139, 92, 246, 0.25);
 
   /* === Transition === */
   --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-fast: all 0.15s ease-out;
 }
 
 /* =====================================================
@@ -141,19 +160,32 @@ a { text-decoration: none; color: inherit; }
 .app-container {
   display: flex;
   min-height: 100vh;
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
 }
 
 .main-content {
   flex: 1;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  min-width: 0;
+  overflow-x: hidden;
+  position: relative;
 }
 
 .page-body {
   flex: 1;
-  padding: 2rem;
+  min-width: 0;
+  padding: 1.75rem 2rem;
   overflow-y: auto;
+  overflow-x: hidden;
+}
+
+@media (max-width: 768px) {
+  .page-body {
+    padding: 1.15rem 1rem;
+  }
 }
 
 /* =====================================================
@@ -515,6 +547,11 @@ a { text-decoration: none; color: inherit; }
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes shimmer {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
 }
 
 @keyframes slideUp {

@@ -3,6 +3,7 @@ import { X, Calendar, User, Clock, Phone, Sparkles, Copy, CheckCircle2, ArrowLef
 import { bookingsAPI, aiAPI } from '../../api';
 import RescheduleModal from './RescheduleModal';
 import { useToast } from '../../components/ui/Toast';
+import { ConfirmModal } from '../../components/ui';
 import './Schedule.css';
 
 export default function BookingDetailPanel({ isOpen, onClose, slot, court, courts, onStatusChange }) {
@@ -15,6 +16,7 @@ export default function BookingDetailPanel({ isOpen, onClose, slot, court, court
   const [generatingAI, setGeneratingAI] = useState(false);
   const [copied, setCopied] = useState(false);
   const [isRescheduleOpen, setIsRescheduleOpen] = useState(false);
+  const [isConfirmCancelOpen, setIsConfirmCancelOpen] = useState(false);
 
   useEffect(() => {
     if (isOpen && slot && slot.status === 'booked') {
@@ -43,11 +45,16 @@ export default function BookingDetailPanel({ isOpen, onClose, slot, court, court
     }
   };
 
-  const handleCancelBooking = async () => {
-    if (!window.confirm('Bạn có chắc chắn muốn hủy lịch này?')) return;
+  const handleCancelBooking = () => {
+    setIsConfirmCancelOpen(true);
+  };
+
+  const handleConfirmCancel = async () => {
+    setIsConfirmCancelOpen(false);
     setCancelling(true);
     try {
       await bookingsAPI.cancel(booking.id);
+      showToast({ type: 'success', message: 'Đã hủy đơn đặt sân thành công' });
       onStatusChange();
       onClose();
     } catch (err) {
@@ -185,6 +192,22 @@ export default function BookingDetailPanel({ isOpen, onClose, slot, court, court
                       >
                         {copied ? <CheckCircle2 size={18} /> : <Copy size={18} />}
                       </button>
+
+                      {/* Standardized Disclaimer */}
+                      <div style={{
+                        marginTop: '0.75rem',
+                        padding: '0.5rem 0.75rem',
+                        background: '#FFFBEB',
+                        border: '1px solid #FDE68A',
+                        borderRadius: 6,
+                        fontSize: '0.74rem',
+                        color: '#B45309',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 5
+                      }}>
+                        <span>⚠️ Kết quả AI chỉ mang tính tham khảo. Vui lòng kiểm tra tính chính xác và xác nhận trước khi sử dụng hoặc thực hiện hành động liên quan đến khách hàng.</span>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -221,6 +244,17 @@ export default function BookingDetailPanel({ isOpen, onClose, slot, court, court
         booking={booking}
         courts={courts}
         onSuccess={handleRescheduleSuccess}
+      />
+
+      <ConfirmModal
+        isOpen={isConfirmCancelOpen}
+        onClose={() => setIsConfirmCancelOpen(false)}
+        onConfirm={handleConfirmCancel}
+        title="Xác nhận hủy lịch đặt"
+        message="Bạn có chắc chắn muốn hủy đơn đặt sân này không? Hành động này sẽ cập nhật trạng thái đơn thành 'Đã hủy'."
+        confirmText="Hủy lịch"
+        confirmVariant="danger"
+        isLoading={cancelling}
       />
     </>
   );

@@ -2,8 +2,9 @@ import { useState, useEffect, useMemo } from 'react';
 import { paymentsAPI, bookingsAPI, customersAPI, courtsAPI } from '../../api';
 import { CreditCard, RefreshCw, Calendar, Filter, X, AlertCircle, ChevronDown, ChevronUp, Trash2, List, Info, ShieldCheck, CheckCircle, Clock, XCircle, Lock, Wallet } from 'lucide-react';
 import { useToast } from '../../components/ui/Toast';
-import { Button, Card, Badge, Modal, Input, Select, Table } from '../../components/ui';
+import { Button, Card, Badge, Modal, Input, Select, Table, ConfirmModal, Pagination } from '../../components/ui';
 import { formatVNDateTime, todayVN } from '../../utils/datetime';
+import { useDebounce } from '../../utils/useDebounce';
 
 const METHOD_MAP   = { cash: 'Tiền mặt', transfer: 'Chuyển khoản', momo: 'MoMo', refund: 'Hoàn tiền' };
 const P_BADGE      = { paid: 'paid', pending: 'unpaid', refunded: 'completed' };
@@ -20,10 +21,17 @@ export default function Payments() {
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({ booking_id: '', amount: '', method: 'cash', status: 'paid' });
 
+  // Confirmation modals
+  const [paymentToDelete, setPaymentToDelete] = useState(null);
+  const [paymentToRefund, setPaymentToRefund] = useState(null);
+  const [actionLoading,   setActionLoading]   = useState(false);
+
   // Tabs
   const [activeTab, setActiveTab] = useState('transactions'); // 'transactions' | 'detail'
 
-  // Filters
+  // Search & Filters
+  const [search, setSearch]             = useState('');
+  const debouncedSearch                 = useDebounce(search, 300);
   const [filterDate,   setFilterDate]   = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [filterMethod, setFilterMethod] = useState('');
@@ -32,6 +40,12 @@ export default function Payments() {
   // Filter cho tab chi tiết
   const [detailFilterDeposit, setDetailFilterDeposit] = useState(''); // '' | 'has_deposit' | 'no_deposit' | 'paid_full' | 'need_pay'
   const [detailFilterStatus,  setDetailFilterStatus]  = useState(''); // '' | 'confirmed' | 'pending' | 'cancelled'
+
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [detailPage, setDetailPage] = useState(1);
+  const [detailPageSize, setDetailPageSize] = useState(10);
 
   useEffect(() => {
     fetchAll();
@@ -166,12 +180,35 @@ export default function Payments() {
       }
       if (filterStatus && p.status !== filterStatus) return false;
       if (filterMethod && p.method !== filterMethod) return false;
+      if (debouncedSearch) {
+        const q = debouncedSearch.toLowerCase().trim();
+        const cust = (getCustomerName(p.booking_id) || '').toLowerCase();
+        const court = (getCourtName(p.booking_id) || '').toLowerCase();
+        const idMatch = String(p.id) === q || `#${p.id}` === q || String(p.booking_id) === q || `#${p.booking_id}` === q;
+        if (!cust.includes(q) && !court.includes(q) && !idMatch) return false;
+      }
       return true;
     });
-  }, [payments, filterDate, filterStatus, filterMethod]);
+  }, [payments, filterDate, filterStatus, filterMethod, debouncedSearch, bookings]);
 
-  const hasFilter = filterDate || filterStatus || filterMethod;
-  const clearFilters = () => { setFilterDate(''); setFilterStatus(''); setFilterMethod(''); };
+  const paginatedTransactions = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, currentPage, pageSize]);
+
+  const paginatedDetails = useMemo(() => {
+    const start = (detailPage - 1) * detailPageSize;
+    return filteredBookingDetails.slice(start, start + detailPageSize);
+  }, [filteredBookingDetails, detailPage, detailPageSize]);
+
+  const hasFilter = Boolean(filterDate || filterStatus || filterMethod || debouncedSearch);
+  const clearFilters = () => { 
+    setFilterDate(''); 
+    setFilterStatus(''); 
+    setFilterMethod(''); 
+    setSearch('');
+    setCurrentPage(1);
+  };
 
   // ── Filtered summary (theo filter) ───────────────────
   const fPaid     = filtered.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0);
@@ -217,25 +254,41 @@ export default function Payments() {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!confirm('Xóa giao dịch này? Thao tác không thể hoàn tác.')) return;
+  const handleDelete = (id) => {
+    setPaymentToDelete(id);
+  };
+
+  const confirmDeletePayment = async () => {
+    if (!paymentToDelete) return;
+    setActionLoading(true);
     try {
-      await paymentsAPI.delete(id);
-      showToast({ type: 'success', message: 'Đã xóa giao dịch' });
+      await paymentsAPI.delete(paymentToDelete);
+      showToast({ type: 'success', message: 'Đã xóa giao dịch thành công' });
+      setPaymentToDelete(null);
       fetchAll();
     } catch (err) {
       showToast({ type: 'error', message: err.response?.data?.detail || 'Không thể xóa giao dịch' });
+    } finally {
+      setActionLoading(false);
     }
   };
 
-  const handleRefund = async (id) => {
-    if (!confirm('Xác nhận hoàn tiền cho giao dịch này?')) return;
+  const handleRefund = (id) => {
+    setPaymentToRefund(id);
+  };
+
+  const confirmRefundPayment = async () => {
+    if (!paymentToRefund) return;
+    setActionLoading(true);
     try {
-      await paymentsAPI.update(id, { status: 'refunded' });
-      showToast({ type: 'success', message: 'Đã ghi nhận hoàn tiền' });
+      await paymentsAPI.update(paymentToRefund, { status: 'refunded' });
+      showToast({ type: 'success', message: 'Đã ghi nhận hoàn tiền thành công' });
+      setPaymentToRefund(null);
       fetchAll();
     } catch (err) {
       showToast({ type: 'error', message: err.response?.data?.detail || 'Thao tác thất bại' });
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -659,22 +712,30 @@ export default function Payments() {
                             fontSize: '0.82rem', fontWeight: 600, paddingBottom: 2, flexShrink: 0 }}>
                 <Filter size={14} /> Lọc giao dịch
               </div>
-              <div style={{ flex: '1 1 150px', minWidth: 140 }}>
-                <Input label="Theo ngày" type="date" value={filterDate} onChange={e => setFilterDate(e.target.value)} />
-              </div>
-              <div style={{ flex: '1 1 150px', minWidth: 140 }}>
-                <Select label="Trạng thái" value={filterStatus} placeholder="Tất cả"
-                  options={[{ value: 'paid', label: 'Đã thanh toán' }, { value: 'pending', label: 'Chờ thanh toán' }, { value: 'refunded', label: 'Đã hoàn tiền' }]}
-                  onChange={e => setFilterStatus(e.target.value)} />
+              <div style={{ flex: '1 1 200px', minWidth: 180 }}>
+                <Input 
+                  label="Tìm kiếm" 
+                  placeholder="Mã đơn, khách, sân..." 
+                  value={search} 
+                  onChange={e => { setSearch(e.target.value); setCurrentPage(1); }} 
+                />
               </div>
               <div style={{ flex: '1 1 140px', minWidth: 130 }}>
+                <Input label="Theo ngày" type="date" value={filterDate} onChange={e => { setFilterDate(e.target.value); setCurrentPage(1); }} />
+              </div>
+              <div style={{ flex: '1 1 140px', minWidth: 130 }}>
+                <Select label="Trạng thái" value={filterStatus} placeholder="Tất cả"
+                  options={[{ value: 'paid', label: 'Đã thanh toán' }, { value: 'pending', label: 'Chờ thanh toán' }, { value: 'refunded', label: 'Đã hoàn tiền' }]}
+                  onChange={e => { setFilterStatus(e.target.value); setCurrentPage(1); }} />
+              </div>
+              <div style={{ flex: '1 1 130px', minWidth: 120 }}>
                 <Select label="Phương thức" value={filterMethod} placeholder="Tất cả"
                   options={[{ value: 'cash', label: 'Tiền mặt' }, { value: 'transfer', label: 'Chuyển khoản' }, { value: 'momo', label: 'MoMo' }]}
-                  onChange={e => setFilterMethod(e.target.value)} />
+                  onChange={e => { setFilterMethod(e.target.value); setCurrentPage(1); }} />
               </div>
               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-end', paddingBottom: 1 }}>
                 <Button variant={filterDate === todayVN() ? 'primary' : 'secondary'} size="sm"
-                  icon={<Calendar size={13} />} onClick={() => setFilterDate(filterDate === todayVN() ? '' : todayVN())}>
+                  icon={<Calendar size={13} />} onClick={() => { setFilterDate(filterDate === todayVN() ? '' : todayVN()); setCurrentPage(1); }}>
                   Hôm nay
                 </Button>
                 {hasFilter && <Button variant="ghost" size="sm" icon={<X size={13} />} onClick={clearFilters}>Xoá lọc</Button>}
@@ -685,6 +746,7 @@ export default function Payments() {
               <div style={{ marginTop: '0.625rem', fontSize: '0.8rem', color: '#64748B',
                             borderTop: '1px solid #E2E8F0', paddingTop: '0.625rem' }}>
                 Hiển thị <strong style={{ color: '#0F172A' }}>{filtered.length}</strong> / {payments.length} giao dịch
+                {debouncedSearch && ` · Khớp với: "${debouncedSearch}"`}
               </div>
             )}
           </Card>
@@ -694,8 +756,19 @@ export default function Payments() {
             <div style={{ padding: '0.875rem 1.25rem', borderBottom: '1px solid #E2E8F0' }}>
               <span style={{ fontWeight: 600, color: '#0F172A', fontSize: '0.9rem' }}>Lịch sử giao dịch</span>
             </div>
-            <Table columns={columns} data={filtered} loading={loading}
+            <Table columns={columns} data={paginatedTransactions} loading={loading}
               emptyText={hasFilter ? 'Không có giao dịch nào khớp với bộ lọc' : 'Chưa có giao dịch nào'} />
+            {filtered.length > 0 && (
+              <div style={{ padding: '0.5rem 1.25rem' }}>
+                <Pagination
+                  currentPage={currentPage}
+                  totalItems={filtered.length}
+                  pageSize={pageSize}
+                  onPageChange={setCurrentPage}
+                  onPageSizeChange={(sz) => { setPageSize(sz); setCurrentPage(1); }}
+                />
+              </div>
+            )}
           </Card>
         </>
       )}
@@ -778,8 +851,19 @@ export default function Payments() {
                 {filteredBookingDetails.filter(b => b.remaining > 0 && b.status !== 'cancelled').length} đơn cần thu thêm
               </span>
             </div>
-            <Table columns={bookingDetailColumns} data={filteredBookingDetails} loading={loading}
+            <Table columns={bookingDetailColumns} data={paginatedDetails} loading={loading}
               emptyText="Không có đơn nào phù hợp với bộ lọc" />
+            {filteredBookingDetails.length > 0 && (
+              <div style={{ padding: '0.5rem 1.25rem' }}>
+                <Pagination
+                  currentPage={detailPage}
+                  totalItems={filteredBookingDetails.length}
+                  pageSize={detailPageSize}
+                  onPageChange={setDetailPage}
+                  onPageSizeChange={(sz) => { setDetailPageSize(sz); setDetailPage(1); }}
+                />
+              </div>
+            )}
           </Card>
         </>
       )}
@@ -892,7 +976,7 @@ export default function Payments() {
                         </p>
                         <p style={{ margin: 0, fontSize: '0.78rem', color: '#166534' }}>
                           {getCustomerName(b.id)} — {getCourtName(b.id)} đã nộp đủ {total.toLocaleString()}đ.
-                          (Nếu có sự cố phát sinh, bạn vẫn có thể chọn loại giao dịch "Hoàn tiền").
+                          (Nếu có sự cố phát sinh, bạn vẫn có thể chọn loại giao dịch &quot;Hoàn tiền&quot;).
                         </p>
                       </div>
                     </div>
@@ -950,6 +1034,28 @@ export default function Payments() {
           })()}
         </form>
       </Modal>
+
+      <ConfirmModal
+        isOpen={Boolean(paymentToDelete)}
+        onClose={() => setPaymentToDelete(null)}
+        onConfirm={confirmDeletePayment}
+        title="Xác nhận xóa giao dịch"
+        message="Bạn có chắc chắn muốn xóa giao dịch thanh toán này? Thao tác này sẽ không thể hoàn tác."
+        confirmText="Xóa giao dịch"
+        confirmVariant="danger"
+        isLoading={actionLoading}
+      />
+
+      <ConfirmModal
+        isOpen={Boolean(paymentToRefund)}
+        onClose={() => setPaymentToRefund(null)}
+        onConfirm={confirmRefundPayment}
+        title="Xác nhận hoàn tiền"
+        message="Bạn có chắc chắn muốn ghi nhận hoàn tiền cho giao dịch này không?"
+        confirmText="Xác nhận hoàn tiền"
+        confirmVariant="warning"
+        isLoading={actionLoading}
+      />
     </div>
   );
 }

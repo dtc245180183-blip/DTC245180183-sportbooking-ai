@@ -3,7 +3,7 @@ import { maintenanceAPI, courtsAPI } from '../../api';
 import { Wrench, Plus, Edit, Trash2, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../components/ui/Toast';
-import { Button, Card, Badge, Modal, Input, Select, Table } from '../../components/ui';
+import { Button, Card, Badge, Modal, Input, Select, Table, ConfirmModal } from '../../components/ui';
 
 const STATUS_OPTS = [
   { value: 'planned',     label: 'Kế hoạch'  },
@@ -31,6 +31,8 @@ export default function Maintenance() {
   const [editId, setEditId] = useState(null);
   const [formData, setFormData] = useState({ court_id: '', start_date: '', end_date: '', reason: '', status: 'planned' });
   const [conflicts, setConflicts] = useState(null);
+  const [scheduleToDelete, setScheduleToDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     fetchAll();
@@ -79,14 +81,22 @@ export default function Maintenance() {
     setShowForm(true);
   };
 
-  const handleDelete = async (id) => {
-    if (!confirm('Xóa lịch bảo trì này?')) return;
+  const handleDelete = (id) => {
+    setScheduleToDelete(id);
+  };
+
+  const confirmDeleteSchedule = async () => {
+    if (!scheduleToDelete) return;
+    setDeleting(true);
     try {
-      await maintenanceAPI.delete(id);
-      showToast({ type: 'success', message: 'Đã xóa lịch bảo trì' });
+      await maintenanceAPI.delete(scheduleToDelete);
+      showToast({ type: 'success', message: 'Đã xóa lịch bảo trì thành công' });
+      setScheduleToDelete(null);
       fetchAll();
     } catch (err) {
       showToast({ type: 'error', message: err.response?.data?.detail || 'Xóa thất bại' });
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -197,6 +207,17 @@ export default function Maintenance() {
           )}
         </form>
       </Modal>
+
+      <ConfirmModal
+        isOpen={Boolean(scheduleToDelete)}
+        onClose={() => setScheduleToDelete(null)}
+        onConfirm={confirmDeleteSchedule}
+        title="Xác nhận xóa lịch bảo trì"
+        message="Bạn có chắc chắn muốn xóa lịch bảo trì này không?"
+        confirmText="Xóa lịch bảo trì"
+        confirmVariant="danger"
+        isLoading={deleting}
+      />
     </div>
   );
 }

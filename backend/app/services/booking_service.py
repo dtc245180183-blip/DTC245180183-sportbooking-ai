@@ -9,6 +9,9 @@ from app.models.payment import Payment
 from app.models.maintenance_schedule import MaintenanceSchedule
 from app.schemas.booking import BookingCreateRequest
 from contextlib import contextmanager
+import threading
+
+_booking_lock = threading.Lock()
 
 @contextmanager
 def transaction(db: Session):
@@ -26,10 +29,11 @@ def transaction(db: Session):
         raise e
 
 def create_booking(db: Session, request: BookingCreateRequest, staff_id: int) -> Booking:
-    with transaction(db):
-        # Cơ chế lock: Dùng with_for_update() để khóa record time_slot trong DB
-        # chống đọc/ghi đồng thời từ các transaction khác cho đến khi transaction này commit/rollback.
-        time_slot = db.query(TimeSlot).with_for_update().filter(TimeSlot.id == request.time_slot_id).first()
+    with _booking_lock:
+        with transaction(db):
+            # Cơ chế lock: Dùng with_for_update() để khóa record time_slot trong DB
+            # chống đọc/ghi đồng thời từ các transaction khác cho đến khi transaction này commit/rollback.
+            time_slot = db.query(TimeSlot).with_for_update().filter(TimeSlot.id == request.time_slot_id).first()
         
         if not time_slot:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Time slot not found")
@@ -146,8 +150,9 @@ def cancel_booking(
         return booking
 
 def reschedule_booking(db: Session, booking_id: int, new_time_slot_id: int) -> dict:
-    with transaction(db):
-        booking = db.query(Booking).with_for_update().filter(Booking.id == booking_id).first()
+    with _booking_lock:
+        with transaction(db):
+            booking = db.query(Booking).with_for_update().filter(Booking.id == booking_id).first()
         if not booking:
             raise HTTPException(status_code=404, detail="Booking not found")
             

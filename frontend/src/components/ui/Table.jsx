@@ -25,9 +25,10 @@ export default function Table({
               <th
                 key={col.key}
                 style={{
-                  padding: '12px 16px',
+                  padding: col.padding || '12px 16px',
                   textAlign: col.align ?? 'left',
                   width: col.width,
+                  minWidth: col.minWidth || (col.width ? undefined : 72),
                   fontSize: '11px',
                   fontWeight: 600,
                   textTransform: 'uppercase',
@@ -36,8 +37,7 @@ export default function Table({
                   borderBottom: '1px solid #E2E8F0',
                   background: '#F8FAFC',
                   whiteSpace: 'nowrap',
-                  /* Đảm bảo khoảng cách tối thiểu giữa các cột */
-                  minWidth: col.width ? undefined : 72,
+                  ...(col.style || {}),
                 }}
               >
                 {col.label}
@@ -54,7 +54,7 @@ export default function Table({
                   <td
                     key={col.key}
                     style={{
-                      padding: '12px 16px',
+                      padding: col.padding || '12px 16px',
                       borderBottom: '1px solid #F1F5F9',
                     }}
                   >
@@ -92,11 +92,14 @@ export default function Table({
                   <td
                     key={col.key}
                     style={{
-                      padding: '12px 16px',
+                      padding: col.padding || '12px 16px',
                       color: '#0F172A',
                       verticalAlign: 'middle',
                       textAlign: col.align ?? 'left',
+                      width: col.width,
+                      minWidth: col.minWidth,
                       borderBottom: '1px solid #F1F5F9',
+                      ...(col.style || {}),
                     }}
                   >
                     {col.render

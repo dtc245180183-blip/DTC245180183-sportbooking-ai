@@ -3,7 +3,7 @@ import { courtsAPI, courtTypesAPI } from '../../api';
 import { Plus, Edit, Trash2, Filter, Building2, Link } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../components/ui/Toast';
-import { Button, Card, Badge, Modal, Input, Select, Table, EmptyState, Skeleton } from '../../components/ui';
+import { Button, Card, Badge, Modal, Input, Select, Table, EmptyState, Skeleton, ConfirmModal } from '../../components/ui';
 import { getSportImage, getSportAccent } from '../../utils/sportImages';
 
 const COURT_STATUS_MAP = {
@@ -158,6 +158,10 @@ export default function Courts() {
   const [showTypeModal, setShowTypeModal] = useState(false);
   const [typeForm, setTypeForm] = useState({ id: null, name: '', description: '', image_url: '' });
 
+  const [courtToDelete, setCourtToDelete] = useState(null);
+  const [typeToDelete, setTypeToDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+
   useEffect(() => { fetchData(); }, [filterType, filterStatus]);
 
   const fetchData = async () => {
@@ -205,14 +209,23 @@ export default function Courts() {
     }
   };
 
-  const handleDeleteCourt = async id => {
-    if (!isAdmin || !window.confirm('Bạn có chắc chắn xóa sân này?')) return;
+  const handleDeleteCourt = id => {
+    if (!isAdmin) return;
+    setCourtToDelete(id);
+  };
+
+  const confirmDeleteCourt = async () => {
+    if (!courtToDelete) return;
+    setDeleting(true);
     try {
-      await courtsAPI.delete(id);
-      showToast({ type: 'success', message: 'Đã xóa sân' });
+      await courtsAPI.delete(courtToDelete);
+      showToast({ type: 'success', message: 'Đã xóa sân thành công' });
+      setCourtToDelete(null);
       fetchData();
     } catch (err) {
       showToast({ type: 'error', message: err.response?.data?.detail || 'Xóa thất bại' });
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -237,14 +250,23 @@ export default function Courts() {
     }
   };
 
-  const handleDeleteType = async id => {
-    if (!isAdmin || !window.confirm('Xóa loại sân này có thể ảnh hưởng đến các sân đang dùng. Tiếp tục?')) return;
+  const handleDeleteType = id => {
+    if (!isAdmin) return;
+    setTypeToDelete(id);
+  };
+
+  const confirmDeleteType = async () => {
+    if (!typeToDelete) return;
+    setDeleting(true);
     try {
-      await courtTypesAPI.delete(id);
-      showToast({ type: 'success', message: 'Đã xóa loại sân' });
+      await courtTypesAPI.delete(typeToDelete);
+      showToast({ type: 'success', message: 'Đã xóa loại sân thành công' });
+      setTypeToDelete(null);
       fetchData();
     } catch (err) {
       showToast({ type: 'error', message: err.response?.data?.detail || 'Xóa thất bại' });
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -300,9 +322,9 @@ export default function Courts() {
           {loading ? (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '1rem' }}>
               {[1, 2, 3, 4].map(i => (
-                <div key={i} style={{ borderRadius: 14, overflow: 'hidden' }}>
+                <div key={i} style={{ borderRadius: 14, overflow: 'hidden', border: '1px solid #E2E8F0', background: '#FFFFFF' }}>
                   <Skeleton variant="rect" height="148px" />
-                  <div style={{ padding: '0.875rem 1rem', background: 'rgba(15,30,60,0.7)' }}>
+                  <div style={{ padding: '0.875rem 1rem', background: '#FFFFFF' }}>
                     <Skeleton variant="text" height="1rem" style={{ marginBottom: 8 }} />
                     <Skeleton variant="text" height="1.3rem" width="60%" />
                   </div>
@@ -392,6 +414,28 @@ export default function Courts() {
             hint="Để trống = tự động chọn ảnh theo tên loại sân" />
         </form>
       </Modal>
+
+      <ConfirmModal
+        isOpen={Boolean(courtToDelete)}
+        onClose={() => setCourtToDelete(null)}
+        onConfirm={confirmDeleteCourt}
+        title="Xác nhận xóa sân"
+        message="Bạn có chắc chắn muốn xóa sân này không? Hành động này sẽ không thể hoàn tác nếu sân đã có dữ liệu liên quan."
+        confirmText="Xóa sân"
+        confirmVariant="danger"
+        isLoading={deleting}
+      />
+
+      <ConfirmModal
+        isOpen={Boolean(typeToDelete)}
+        onClose={() => setTypeToDelete(null)}
+        onConfirm={confirmDeleteType}
+        title="Xác nhận xóa loại sân"
+        message="Xóa loại sân này có thể ảnh hưởng đến các sân đang sử dụng. Bạn có chắc chắn muốn tiếp tục?"
+        confirmText="Xóa loại sân"
+        confirmVariant="danger"
+        isLoading={deleting}
+      />
     </div>
   );
 }

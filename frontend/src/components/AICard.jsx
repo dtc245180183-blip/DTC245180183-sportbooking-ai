@@ -31,7 +31,7 @@ export default function AICard({ loading = false, title, children, error }) {
       </div>
 
       <div className="ai-card-footer">
-        ⚠️ Nội dung do AI tạo ra, vui lòng kiểm tra lại trước khi gửi khách hàng.
+        ⚠️ Kết quả AI chỉ mang tính tham khảo. Vui lòng kiểm tra tính chính xác và xác nhận trước khi sử dụng hoặc thực hiện hành động liên quan đến khách hàng.
       </div>
     </div>
   );
