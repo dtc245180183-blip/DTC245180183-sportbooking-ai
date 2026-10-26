@@ -122,3 +122,23 @@ def test_update_payment_amount_fails():
     res = client.put("/payments/1", json=payload, headers=headers)
     assert res.status_code == 200
     assert res.json()["amount"] == 100000 # Amount is unchanged because Pydantic strips it
+
+def test_refund_exceeding_max_refundable_fails():
+    headers = get_auth_headers()
+    # Booking 2 is cancelled with 0 paid, attempt to refund 50,000 should fail
+    payload = {
+        "booking_id": 2,
+        "amount": 50000,
+        "method": "cash",
+        "status": "refunded"
+    }
+    res = client.post("/payments/", json=payload, headers=headers)
+    assert res.status_code == 400
+    assert "vượt quá số tiền tối đa có thể hoàn" in res.json()["detail"]
+
+def test_forfeit_deposit_endpoint():
+    headers = get_auth_headers()
+    # Booking 2 is cancelled, forfeit its deposit
+    res = client.put("/bookings/2/forfeit-deposit", headers=headers)
+    assert res.status_code == 200
+    assert res.json()["deposit_forfeited"] is True

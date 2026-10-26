@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Sparkles } from 'lucide-react';
+import { X, Sparkles, AlertCircle, Info, RefreshCw, Lock, Clock } from 'lucide-react';
 import { aiAPI, courtTypesAPI } from '../../api';
 import AICard from '../../components/AICard';
 
@@ -15,12 +15,14 @@ export default function AISuggestModal({ isOpen, onClose, onSelectSlot }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState(null);
+  const [isRetrying, setIsRetrying] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
       loadCourtTypes();
       setResult(null);
       setError('');
+      setIsRetrying(false);
     }
   }, [isOpen]);
 
@@ -36,8 +38,8 @@ export default function AISuggestModal({ isOpen, onClose, onSelectSlot }) {
     }
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const executeSearch = async () => {
+    if (loading) return; // Ngăn gửi lặp request
     setLoading(true);
     setError('');
     setResult(null);
@@ -53,10 +55,27 @@ export default function AISuggestModal({ isOpen, onClose, onSelectSlot }) {
       const data = await aiAPI.suggestSlot(payload);
       setResult(data);
     } catch (err) {
-      setError(err.response?.data?.detail || err.message || 'Lỗi khi gọi AI');
+      let msg = 'Chưa thể lấy gợi ý khung giờ lúc này. Vui lòng thử lại.';
+      const detail = err.response?.data?.detail;
+      if (typeof detail === 'string' && detail.trim() && !detail.includes('<html') && !detail.toLowerCase().includes('status code') && !detail.toLowerCase().includes('504')) {
+        msg = detail;
+      }
+      setError(msg);
     } finally {
       setLoading(false);
+      setIsRetrying(false);
     }
+  };
+
+  const handleSubmit = (e) => {
+    if (e) e.preventDefault();
+    setIsRetrying(false);
+    executeSearch();
+  };
+
+  const handleRetry = () => {
+    setIsRetrying(true);
+    executeSearch();
   };
 
   if (!isOpen) return null;
@@ -144,56 +163,215 @@ export default function AISuggestModal({ isOpen, onClose, onSelectSlot }) {
             </div>
 
             <div style={{ gridColumn: '1 / -1', marginTop: '0.5rem' }}>
-              <button type="submit" className="btn-primary" style={{ width: '100%', background: '#7C3AED', borderColor: '#7C3AED' }} disabled={loading}>
-                {loading ? 'Đang phân tích...' : 'Tìm khung giờ trống'}
+              <button
+                type="submit"
+                className="btn-primary"
+                style={{
+                  width: '100%',
+                  background: '#7C3AED',
+                  borderColor: '#7C3AED',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  opacity: loading ? 0.75 : 1
+                }}
+                disabled={loading}
+              >
+                {loading ? (
+                  <>
+                    <span className="ai-spinner" style={{ width: 16, height: 16, borderTopColor: '#ffffff', borderColor: 'rgba(255,255,255,0.3)' }} />
+                    <span>Đang tìm kiếm khung giờ trống...</span>
+                  </>
+                ) : (
+                  'Tìm khung giờ trống'
+                )}
               </button>
             </div>
           </form>
 
-          {error && <div className="error-message" style={{ color: 'var(--danger-color)' }}>{error}</div>}
+          {isRetrying && loading && (
+            <div style={{
+              marginTop: '1rem',
+              padding: '0.625rem 0.875rem',
+              background: '#EFF6FF',
+              border: '1px solid #BFDBFE',
+              borderRadius: '8px',
+              color: '#1D4ED8',
+              fontSize: '0.85rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}>
+              <span className="ai-spinner" style={{ width: 14, height: 14 }} />
+              <span>Hệ thống đang thử lại tìm kiếm khung giờ...</span>
+            </div>
+          )}
+
+          {error && !loading && (
+            <div style={{
+              marginTop: '1rem',
+              padding: '0.875rem 1rem',
+              background: '#FEF2F2',
+              border: '1px solid #FECACA',
+              borderRadius: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '0.75rem'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#B91C1C', fontSize: '0.875rem' }}>
+                <AlertCircle size={18} style={{ flexShrink: 0 }} />
+                <span>{error}</span>
+              </div>
+              <button
+                type="button"
+                onClick={handleRetry}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  background: '#DC2626',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  borderRadius: '6px',
+                  padding: '6px 12px',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                <RefreshCw size={14} /> Thử lại
+              </button>
+            </div>
+          )}
 
           {result && (
-            <AICard title="Gợi ý từ Trợ lý">
-              <p style={{ margin: '0 0 1rem 0', whiteSpace: 'pre-wrap', fontSize: '0.95rem', lineHeight: 1.5 }}>
-                {result.suggestions_text || result.message}
-              </p>
-              
-              {result.matched_slots && result.matched_slots.length > 0 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem', marginTop: '0.5rem' }}>
-                  <strong style={{ fontSize: '0.85rem', color: '#1E293B', letterSpacing: '0.04em', fontWeight: 700 }}>
-                    CÁC KHUNG GIỜ PHÙ HỢP ({result.matched_slots.length} ca trống):
-                  </strong>
-                  {result.matched_slots.map(s => (
-                    <div key={s.slot_id} style={{
-                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                      background: '#FFFFFF',
-                      border: '1px solid #C7D2FE',
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-                      padding: '0.875rem 1rem', borderRadius: '10px'
-                    }}>
-                      <div>
-                        <span style={{ fontWeight: 700, color: '#0F172A', fontSize: '0.95rem' }}>{s.court_name}</span>
-                        <span style={{ margin: '0 0.5rem', color: '#94A3B8' }}>·</span>
-                        <span style={{ color: '#4338CA', fontWeight: 600, fontSize: '0.9rem' }}>{s.start_time} - {s.end_time}</span>
-                        {s.price && (
-                          <span style={{ marginLeft: '0.5rem', color: '#059669', fontSize: '0.8rem', fontWeight: 600 }}>
-                            ({Number(s.price).toLocaleString()}đ/giờ)
-                          </span>
-                        )}
-                      </div>
-                      <button
-                        style={{ padding: '6px 14px', background: '#6366F1', color: '#ffffff',
-                                 border: 'none', borderRadius: 8,
-                                 fontWeight: 600, fontSize: '0.82rem', cursor: 'pointer', transition: 'all 0.15s' }}
-                        onClick={() => { onSelectSlot(s.slot_id); onClose(); }}
-                      >
-                        Chọn đặt
-                      </button>
-                    </div>
-                  ))}
+            <div style={{ marginTop: '1.25rem' }}>
+              {result.is_fallback && (
+                <div style={{
+                  marginBottom: '1rem',
+                  padding: '0.75rem 1rem',
+                  background: '#FFFBEB',
+                  border: '1px solid #FDE68A',
+                  borderRadius: '8px',
+                  color: '#92400E',
+                  fontSize: '0.85rem',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '0.5rem',
+                  lineHeight: 1.5
+                }}>
+                  <Info size={18} style={{ color: '#D97706', flexShrink: 0, marginTop: '2px' }} />
+                  <div>
+                    <strong style={{ color: '#B45309', display: 'block', marginBottom: '2px' }}>
+                      Gợi ý dự phòng từ hệ thống:
+                    </strong>
+                    Dịch vụ AI phản hồi chậm hoặc tạm thời gián đoạn. Các khung giờ dưới đây là gợi ý dự phòng được rà soát trực tiếp từ các khung giờ thực tế đang còn trống trong cơ sở dữ liệu.
+                  </div>
                 </div>
               )}
-            </AICard>
+
+              <AICard title={result.is_fallback ? 'Gợi ý dự phòng từ hệ thống' : 'Gợi ý từ Trợ lý AI'}>
+                <p style={{ margin: '0 0 1rem 0', whiteSpace: 'pre-wrap', fontSize: '0.95rem', lineHeight: 1.5 }}>
+                  {result.suggestions_text || result.message}
+                </p>
+                
+                {result.matched_slots && result.matched_slots.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem', marginTop: '0.5rem' }}>
+                    <strong style={{ fontSize: '0.85rem', color: '#1E293B', letterSpacing: '0.04em', fontWeight: 700 }}>
+                      CÁC KHUNG GIỜ PHÙ HỢP ({result.matched_slots.length} ca trống):
+                    </strong>
+                    {result.matched_slots.map(s => (
+                      <div key={s.slot_id} style={{
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                        background: '#FFFFFF',
+                        border: '1px solid #C7D2FE',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                        padding: '0.875rem 1rem', borderRadius: '10px'
+                      }}>
+                        <div>
+                          <span style={{ fontWeight: 700, color: '#0F172A', fontSize: '0.95rem' }}>{s.court_name}</span>
+                          <span style={{ margin: '0 0.5rem', color: '#94A3B8' }}>·</span>
+                          <span style={{ color: '#4338CA', fontWeight: 600, fontSize: '0.9rem' }}>{s.start_time} - {s.end_time}</span>
+                          {s.price && (
+                            <span style={{ marginLeft: '0.5rem', color: '#059669', fontSize: '0.8rem', fontWeight: 600 }}>
+                              ({Number(s.price).toLocaleString()}đ/giờ)
+                            </span>
+                          )}
+                        </div>
+                        <button
+                          style={{ padding: '6px 14px', background: '#6366F1', color: '#ffffff',
+                                   border: 'none', borderRadius: 8,
+                                   fontWeight: 600, fontSize: '0.82rem', cursor: 'pointer', transition: 'all 0.15s' }}
+                          onClick={() => { onSelectSlot(s.slot_id); onClose(); }}
+                        >
+                          Chọn đặt
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* 🔒 Danh sách khung giờ đã có người đặt */}
+                {result.booked_slots && result.booked_slots.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem', marginTop: '1.25rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <strong style={{ fontSize: '0.85rem', color: '#DC2626', letterSpacing: '0.04em', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <Lock size={14} style={{ color: '#EF4444' }} /> KHUNG GIỜ ĐÃ CÓ NGƯỜI ĐẶT ({result.booked_slots.length} ca kín):
+                      </strong>
+                      <span style={{ fontSize: '0.72rem', color: '#991B1B', background: '#FEE2E2', border: '1px solid #FECACA', padding: '1px 8px', borderRadius: 999, fontWeight: 700 }}>
+                        Đã kín
+                      </span>
+                    </div>
+
+                    {result.booked_slots.map((b, idx) => (
+                      <div key={b.slot_id || idx} style={{
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                        background: '#FFF5F5',
+                        border: '1px solid #FED7D7',
+                        boxShadow: '0 1px 3px rgba(220, 38, 38, 0.04)',
+                        padding: '0.75rem 1rem', borderRadius: '10px'
+                      }}>
+                        <div>
+                          <div style={{ fontWeight: 700, color: '#991B1B', fontSize: '0.92rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span>{b.court_name}</span>
+                            <span style={{ fontSize: '0.68rem', background: '#FEE2E2', color: '#B91C1C', border: '1px solid #FCA5A5', padding: '1px 6px', borderRadius: 4, fontWeight: 700 }}>
+                              🔒 Đã đặt
+                            </span>
+                          </div>
+                          <div style={{ fontSize: '0.82rem', color: '#7F1D1D', marginTop: 4, display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontWeight: 600 }}>
+                              <Clock size={13} style={{ color: '#DC2626' }} /> {b.start_time} – {b.end_time}
+                            </span>
+                            <span style={{ color: '#FCA5A5' }}>·</span>
+                            <span>Khách đặt: <strong style={{ color: '#991B1B' }}>{b.customer_name || 'Khách'}</strong></span>
+                            {b.booking_id && (
+                              <span style={{ background: '#FFFFFF', border: '1px solid #FCA5A5', padding: '1px 5px', borderRadius: 4, fontSize: '0.72rem', fontWeight: 600 }}>
+                                #{b.booking_id}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <span style={{
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
+                          color: '#DC2626',
+                          background: '#FFFFFF',
+                          border: '1px solid #FCA5A5',
+                          borderRadius: 6,
+                          padding: '3px 8px',
+                          whiteSpace: 'nowrap'
+                        }}>
+                          Đã có khách
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </AICard>
+            </div>
           )}
         </div>
       </div>

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from typing import List, Any
 from app.database import get_db
 from app.models.maintenance_schedule import MaintenanceSchedule
@@ -56,7 +56,7 @@ def get_conflicting_bookings(db: Session, court_id: int, start_date, end_date):
 
 @router.get("/", response_model=List[MaintenanceScheduleResponse])
 def get_schedules(db: Session = Depends(get_db), current_user = Depends(get_current_user)):
-    return db.query(MaintenanceSchedule).all()
+    return db.query(MaintenanceSchedule).options(joinedload(MaintenanceSchedule.court)).all()
 
 @router.post("/", response_model=MaintenanceScheduleResponse)
 def create_schedule(schedule: MaintenanceScheduleCreate, force: bool = False, db: Session = Depends(get_db), current_user = Depends(require_admin)):

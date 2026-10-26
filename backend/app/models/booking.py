@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, Text, ForeignKey
+from sqlalchemy import Column, Integer, String, Float, DateTime, Text, ForeignKey, Boolean
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.database import Base
@@ -14,6 +14,7 @@ class Booking(Base):
     
     status = Column(String, nullable=False, default="pending") # pending, confirmed, cancelled, completed
     deposit_amount = Column(Float, default=0.0)
+    deposit_forfeited = Column(Boolean, default=False)
     total_amount = Column(Float, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     note = Column(Text)

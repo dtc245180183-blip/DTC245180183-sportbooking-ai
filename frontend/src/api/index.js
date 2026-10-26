@@ -47,6 +47,7 @@ export const bookingsAPI = {
   confirm: (id) => api.put(`/bookings/${id}/confirm`).then(r => r.data),
   cancel: (id, data) => api.put(`/bookings/${id}/cancel`, data).then(r => r.data),
   reschedule: (id, data) => api.put(`/bookings/${id}/reschedule`, data).then(r => r.data),
+  forfeitDeposit: (id) => api.put(`/bookings/${id}/forfeit-deposit`).then(r => r.data),
 };
 
 export const customersAPI = {

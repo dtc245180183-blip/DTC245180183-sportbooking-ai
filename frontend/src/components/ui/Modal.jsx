@@ -14,16 +14,20 @@ import { X } from 'lucide-react';
  */
 export default function Modal({
   open,
+  isOpen,
   onClose,
   title,
   size = 'md',
+  maxWidth,
   children,
   footer,
 }) {
+  const isModalOpen = Boolean(open ?? isOpen);
+
   /* ESC để đóng */
   const handleKeyDown = useCallback(
-    (e) => { if (e.key === 'Escape' && open) onClose?.(); },
-    [open, onClose]
+    (e) => { if (e.key === 'Escape' && isModalOpen) onClose?.(); },
+    [isModalOpen, onClose]
   );
   useEffect(() => {
     document.addEventListener('keydown', handleKeyDown);
@@ -32,18 +36,18 @@ export default function Modal({
 
   /* Khoá scroll body khi mở */
   useEffect(() => {
-    if (open) {
+    if (isModalOpen) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = '';
     }
     return () => { document.body.style.overflow = ''; };
-  }, [open]);
+  }, [isModalOpen]);
 
-  if (!open) return null;
+  if (!isModalOpen) return null;
 
   const maxWidths = { sm: 420, md: 560, lg: 672, xl: 896 };
-  const maxW = maxWidths[size] ?? maxWidths.md;
+  const maxW = maxWidth ?? (maxWidths[size] ?? maxWidths.md);
 
   const modalContent = (
     <>

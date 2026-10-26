@@ -61,8 +61,8 @@ def setup_db():
     db.commit()
     
     # Init slots
-    slot1 = TimeSlot(court_id=court_cheap.id, date=date(2026, 10, 1), start_time=dt_time(10, 0), end_time=dt_time(11, 0), status="booked")
-    slot2 = TimeSlot(court_id=court_expensive.id, date=date(2026, 10, 1), start_time=dt_time(10, 0), end_time=dt_time(11, 0), status="available")
+    slot1 = TimeSlot(court_id=court_cheap.id, date=date(2028, 10, 1), start_time=dt_time(10, 0), end_time=dt_time(11, 0), status="booked")
+    slot2 = TimeSlot(court_id=court_expensive.id, date=date(2028, 10, 1), start_time=dt_time(10, 0), end_time=dt_time(11, 0), status="available")
     db.add_all([slot1, slot2])
     db.commit()
     
@@ -78,7 +78,7 @@ def setup_db():
     db.add(booking_completed)
     db.commit()
     
-    slot3 = TimeSlot(court_id=court_cheap.id, date=date(2026, 10, 2), start_time=dt_time(10, 0), end_time=dt_time(11, 0), status="booked")
+    slot3 = TimeSlot(court_id=court_cheap.id, date=date(2028, 10, 2), start_time=dt_time(10, 0), end_time=dt_time(11, 0), status="booked")
     db.add(slot3)
     db.commit()
     
@@ -175,6 +175,27 @@ def test_create_booking_success():
     res = client.post("/bookings/", json=payload, headers=headers)
     assert res.status_code == 201
 
+def test_create_booking_in_past_fails():
+    headers = get_auth_headers()
+    db = TestingSessionLocal()
+    from app.models.time_slot import TimeSlot
+    past_slot = TimeSlot(court_id=1, date=date(2020, 1, 1), start_time=dt_time(8,0), end_time=dt_time(9,0), status="available")
+    db.add(past_slot)
+    db.commit()
+    db.refresh(past_slot)
+    slot_id = past_slot.id
+    db.close()
+    
+    payload = {
+        "customer_id": 1,
+        "court_id": 1,
+        "time_slot_id": slot_id,
+        "deposit_amount": 0
+    }
+    res = client.post("/bookings/", json=payload, headers=headers)
+    assert res.status_code == 400
+    assert "quá khứ" in res.json()["detail"]
+
 def test_create_booking_unavailable_slot_fails():
     headers = get_auth_headers()
     # slot1 is booked in setup_db
@@ -245,3 +266,30 @@ def test_concurrent_booking_same_slot_only_one_succeeds():
     
     assert results.count(201) == 1
     assert results.count(409) == 1
+
+def test_create_booking_with_deposit_auto_creates_payment():
+    headers = get_auth_headers()
+    db = TestingSessionLocal()
+    from app.models.time_slot import TimeSlot
+    slot = TimeSlot(court_id=1, date=date(2028, 5, 5), start_time=dt_time(14,0), end_time=dt_time(15,0), status="available")
+    db.add(slot)
+    db.commit()
+    db.refresh(slot)
+    slot_id = slot.id
+    db.close()
+
+    payload = {
+        "customer_id": 1,
+        "court_id": 1,
+        "time_slot_id": slot_id,
+        "deposit_amount": 50000,
+        "deposit_method": "momo"
+    }
+    res = client.post("/bookings/", json=payload, headers=headers)
+    assert res.status_code == 201
+    data = res.json()
+    assert data["deposit_amount"] == 50000
+    assert len(data["payments"]) == 1
+    assert data["payments"][0]["amount"] == 50000
+    assert data["payments"][0]["status"] == "paid"
+

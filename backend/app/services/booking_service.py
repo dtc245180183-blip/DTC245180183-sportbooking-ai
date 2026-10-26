@@ -2,6 +2,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import OperationalError
 from typing import Optional
+from datetime import datetime, timezone, timedelta
 from app.models.booking import Booking
 from app.models.time_slot import TimeSlot
 from app.models.court import Court
@@ -35,60 +36,84 @@ def create_booking(db: Session, request: BookingCreateRequest, staff_id: int) ->
             # chống đọc/ghi đồng thời từ các transaction khác cho đến khi transaction này commit/rollback.
             time_slot = db.query(TimeSlot).with_for_update().filter(TimeSlot.id == request.time_slot_id).first()
         
-        if not time_slot:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Time slot not found")
+            if not time_slot:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Time slot not found")
+                
+            if str(time_slot.status) != "available":
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT, 
+                    detail="Khung giờ vừa được đặt, vui lòng chọn khung giờ khác"
+                )
+                
+            # Kiểm tra thời gian thực (Giờ Việt Nam UTC+7): Không cho phép đặt khung giờ trong quá khứ hoặc đã bắt đầu
+            tz_vn = timezone(timedelta(hours=7))
+            now_vn = datetime.now(tz_vn).replace(tzinfo=None)
+            slot_start_dt = datetime.combine(time_slot.date, time_slot.start_time)
+            if slot_start_dt <= now_vn:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Không thể đặt sân cho khung giờ trong quá khứ (khung giờ bắt đầu lúc {slot_start_dt.strftime('%H:%M %d/%m/%Y')} đã trôi qua so với thời gian hiện tại {now_vn.strftime('%H:%M %d/%m/%Y')})."
+                )
+                
+            court = db.query(Court).filter(Court.id == time_slot.court_id).first()
+            if not court:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Court not found")
+
+            # Kiểm tra nếu sân đang bảo trì hoặc ngày slot nằm trong lịch bảo trì hiệu lực
+            is_maintenance = court.status == "maintenance" or db.query(MaintenanceSchedule).filter(
+                MaintenanceSchedule.court_id == court.id,
+                MaintenanceSchedule.status.in_(["planned", "scheduled", "in_progress"]),
+                MaintenanceSchedule.start_date <= time_slot.date,
+                time_slot.date <= MaintenanceSchedule.end_date
+            ).first() is not None
+
+            if is_maintenance:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Sân đang trong lịch bảo trì vào ngày này, không thể đặt hoặc đổi lịch"
+                )
+
+            # Kiểm tra số tiền cọc: 0 <= deposit_amount <= giá sân
+            dep_amount = float(request.deposit_amount or 0.0)
+            if dep_amount < 0 or dep_amount > court.price_per_hour:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Tiền cọc không hợp lệ (phải từ 0đ đến tối đa {court.price_per_hour:,.0f}đ bằng giá sân)"
+                )
+                
+            # 1. Cập nhật status của khung giờ
+            setattr(time_slot, "status", "booked")
             
-        if str(time_slot.status) != "available":
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT, 
-                detail="Khung giờ vừa được đặt, vui lòng chọn khung giờ khác"
+            # 2. Tạo booking (total_amount lấy chuẩn từ hệ thống, không tin tưởng client truyền lên)
+            new_booking = Booking(
+                customer_id=request.customer_id,
+                court_id=time_slot.court_id,
+                time_slot_id=request.time_slot_id,
+                staff_id=staff_id,
+                status="pending",
+                deposit_amount=request.deposit_amount,
+                deposit_forfeited=False,
+                total_amount=court.price_per_hour,
+                note=request.note
             )
             
-        court = db.query(Court).filter(Court.id == time_slot.court_id).first()
-        if not court:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Court not found")
+            db.add(new_booking)
+            db.flush() # Để có ID nếu cần, commit được quản lý bởi context manager
 
-        # Kiểm tra nếu sân đang bảo trì hoặc ngày slot nằm trong lịch bảo trì hiệu lực
-        is_maintenance = court.status == "maintenance" or db.query(MaintenanceSchedule).filter(
-            MaintenanceSchedule.court_id == court.id,
-            MaintenanceSchedule.status.in_(["planned", "scheduled", "in_progress"]),
-            MaintenanceSchedule.start_date <= time_slot.date,
-            time_slot.date <= MaintenanceSchedule.end_date
-        ).first() is not None
+            # 3. Tự động sinh Payment cho khoản cọc ban đầu nếu có cọc
+            if dep_amount > 0:
+                deposit_payment = Payment(
+                    booking_id=new_booking.id,
+                    amount=dep_amount,
+                    method=request.deposit_method or "cash",
+                    status="paid",
+                    paid_at=datetime.now(timezone.utc)
+                )
+                db.add(deposit_payment)
+                db.flush()
 
-        if is_maintenance:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Sân đang trong lịch bảo trì vào ngày này, không thể đặt hoặc đổi lịch"
-            )
-
-        # Kiểm tra số tiền cọc: 0 <= deposit_amount <= giá sân
-        dep_amount = float(request.deposit_amount or 0.0)
-        if dep_amount < 0 or dep_amount > court.price_per_hour:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Tiền cọc không hợp lệ (phải từ 0đ đến tối đa {court.price_per_hour:,.0f}đ bằng giá sân)"
-            )
-            
-        # 1. Cập nhật status của khung giờ
-        setattr(time_slot, "status", "booked")
-        
-        # 2. Tạo booking (total_amount lấy chuẩn từ hệ thống, không tin tưởng client truyền lên)
-        new_booking = Booking(
-            customer_id=request.customer_id,
-            court_id=time_slot.court_id,
-            time_slot_id=request.time_slot_id,
-            staff_id=staff_id,
-            status="pending",
-            deposit_amount=request.deposit_amount,
-            total_amount=court.price_per_hour,
-            note=request.note
-        )
-        
-        db.add(new_booking)
-        db.flush() # Để có ID nếu cần, commit được quản lý bởi context manager
-        db.refresh(new_booking)
-        return new_booking
+            db.refresh(new_booking)
+            return new_booking
 
 def cancel_booking(
     db: Session, 
@@ -118,30 +143,71 @@ def cancel_booking(
             ).first()
             setattr(time_slot, "status", "blocked" if court_maint else "available")
             
-        # Xử lý cọc theo lựa chọn của người quản lý giao dịch
-        dep_amount = float(booking.deposit_amount or 0.0) # type: ignore
-        if dep_amount > 0:
+        # Xử lý hoàn tiền / phạt cọc theo chuẩn dòng tiền
+        paid_payments = db.query(Payment).filter(
+            Payment.booking_id == booking.id,
+            Payment.status == "paid"
+        ).all()
+        total_paid = sum(p.amount for p in paid_payments)
+        
+        # Nếu chưa có payment paid mà booking có deposit_amount (dữ liệu cũ)
+        if total_paid == 0.0 and float(booking.deposit_amount or 0.0) > 0:
+            total_paid = float(booking.deposit_amount)
+            
+        already_refunded = sum(
+            p.amount for p in db.query(Payment).filter(
+                Payment.booking_id == booking.id,
+                Payment.status == "refunded"
+            ).all()
+        )
+        net_paid = max(0.0, total_paid - already_refunded)
+        dep_amount = float(booking.deposit_amount or 0.0)
+        
+        if net_paid > 0:
             if refund_deposit:
-                from datetime import datetime, timezone
+                # Hoàn toàn bộ số tiền khách đang nộp
                 refund_payment = Payment(
                     booking_id=booking.id,
-                    amount=dep_amount,
+                    amount=net_paid,
                     method=refund_method or "cash",
                     status="refunded",
                     paid_at=datetime.now(timezone.utc)
                 )
                 db.add(refund_payment)
-                note_str = f" [Đã hủy - Đã hoàn cọc {dep_amount:,.0f}đ"
+                note_str = f" [Đã hủy - Đã hoàn cọc {net_paid:,.0f}đ"
                 if reason:
                     note_str += f": {reason}"
                 note_str += "]"
                 booking.note = (booking.note or "") + note_str # type: ignore
             else:
-                note_str = f" [Đã hủy - Giữ cọc {dep_amount:,.0f}đ"
-                if reason:
-                    note_str += f": {reason}"
-                note_str += "]"
-                booking.note = (booking.note or "") + note_str # type: ignore
+                # Giữ cọc: tiền giữ lại tối đa là dep_amount
+                kept_deposit = min(dep_amount, net_paid)
+                excess_paid = net_paid - kept_deposit
+                if excess_paid > 0:
+                    # Hoàn lại phần tiền nộp thừa vượt cọc
+                    refund_payment = Payment(
+                        booking_id=booking.id,
+                        amount=excess_paid,
+                        method=refund_method or "cash",
+                        status="refunded",
+                        paid_at=datetime.now(timezone.utc)
+                    )
+                    db.add(refund_payment)
+                    note_str = f" [Đã hủy - Giữ cọc {kept_deposit:,.0f}đ, hoàn tiền thừa {excess_paid:,.0f}đ"
+                    if reason:
+                        note_str += f": {reason}"
+                    note_str += "]"
+                    booking.note = (booking.note or "") + note_str # type: ignore
+                else:
+                    note_str = f" [Đã hủy - Giữ cọc {kept_deposit:,.0f}đ"
+                    if reason:
+                        note_str += f": {reason}"
+                    note_str += "]"
+                    booking.note = (booking.note or "") + note_str # type: ignore
+                
+                # Chốt giữ cọc vào doanh thu
+                if kept_deposit > 0 or dep_amount > 0:
+                    setattr(booking, "deposit_forfeited", True)
         elif reason:
             booking.note = (booking.note or "") + f" [Đã hủy: {reason}]" # type: ignore
             
@@ -170,6 +236,16 @@ def reschedule_booking(db: Session, booking_id: int, new_time_slot_id: int) -> d
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT, 
                 detail="Khung giờ mới đã được đặt hoặc không khả dụng."
+            )
+
+        # Kiểm tra thời gian thực: Không cho phép đổi sang khung giờ trong quá khứ hoặc đã bắt đầu
+        tz_vn = timezone(timedelta(hours=7))
+        now_vn = datetime.now(tz_vn).replace(tzinfo=None)
+        new_slot_start_dt = datetime.combine(new_time_slot.date, new_time_slot.start_time)
+        if new_slot_start_dt <= now_vn:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Không thể đổi sang khung giờ đã trôi qua so với thời gian thực (khung giờ bắt đầu lúc {new_slot_start_dt.strftime('%H:%M %d/%m/%Y')} đã qua so với thời gian hiện tại {now_vn.strftime('%H:%M %d/%m/%Y')})."
             )
         
         # Lấy giá sân mới (có thể khác sân cũ)

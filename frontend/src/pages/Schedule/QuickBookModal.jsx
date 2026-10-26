@@ -31,9 +31,26 @@ export default function QuickBookModal({ isOpen, onClose, slot, court, onBooking
     }
   };
 
+  const isPast = (() => {
+    if (!slot) return false;
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    if (slot.date < todayStr) return true;
+    if (slot.date > todayStr) return false;
+    const [startH, startM] = String(slot.start_time).slice(0, 5).split(':').map(Number);
+    const slotTimeMinutes = startH * 60 + startM;
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    return slotTimeMinutes <= currentMinutes;
+  })();
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!slot || !court) return;
+
+    if (isPast) {
+      setError('Khung giờ này đã trôi qua so với thời gian thực. Không thể đặt sân.');
+      return;
+    }
     
     setLoading(true);
     setError('');
@@ -171,13 +188,18 @@ export default function QuickBookModal({ isOpen, onClose, slot, court, onBooking
               </div>
             </div>
 
+            {isPast && (
+              <div style={{ color: '#B91C1C', fontSize: '0.85rem', padding: '0.65rem 0.85rem', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8 }}>
+                ⚠️ Khung giờ này đã trôi qua so với thời gian thực. Không thể tạo đơn đặt sân.
+              </div>
+            )}
             {error && <div className="error-message" style={{ color: 'var(--danger-color)', fontSize: '0.85rem', padding: '0.5rem', background: 'rgba(220,38,38,0.1)', borderRadius: '4px' }}>{error}</div>}
           </div>
           
           <div className="modal-footer">
             <button type="button" className="btn-outline" onClick={onClose}>Hủy</button>
-            <button type="submit" className="btn-primary" disabled={loading}>
-              {loading ? 'Đang xử lý...' : 'Xác nhận Đặt sân'}
+            <button type="submit" className="btn-primary" disabled={loading || isPast}>
+              {loading ? 'Đang xử lý...' : isPast ? 'Khung giờ đã qua' : 'Xác nhận Đặt sân'}
             </button>
           </div>
         </form>

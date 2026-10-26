@@ -236,6 +236,8 @@
 
 .legend-dot.available { background: #10B981; }
 .legend-dot.booked { background: #059669; }
+.legend-dot.in-use { background: #2563EB; box-shadow: 0 0 6px rgba(37, 99, 235, 0.6); }
+.legend-dot.completed { background: #64748B; }
 .legend-dot.blocked { background: #94A3B8; }
 .legend-dot.maintenance { background: #CBD5E1; }
 .legend-dot.peak { background: #F59E0B; }
@@ -509,7 +511,7 @@
 }
 
 /* HOVER VÀO Ô TRỐNG: NỀN XANH NGỌC PASTEL #ECFDF5, VIỀN XANH #10B981, HIỆN NÚT ĐẶT SÂN */
-.slot-cell.available:hover {
+.slot-cell.available:not(.past):hover {
   background-color: #ECFDF5 !important;
   border: 1.5px solid #10B981 !important;
   box-shadow: inset 0 0 0 1px #10B981, 0 2px 6px rgba(16, 185, 129, 0.12);
@@ -517,11 +519,11 @@
   border-radius: 6px;
 }
 
-.slot-cell.available:hover .slot-available-idle {
+.slot-cell.available:not(.past):hover .slot-available-idle {
   display: none;
 }
 
-.slot-cell.available:hover .slot-available-hover {
+.slot-cell.available:not(.past):hover .slot-available-hover {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -535,6 +537,32 @@
   width: 100%;
   height: 100%;
   animation: fadeInScale 0.15s ease;
+}
+
+/* Ô KHUNG GIỜ ĐÃ TRÔI QUA THỜI GIAN THỰC */
+.slot-cell.past {
+  background-color: #F8FAFC !important;
+  opacity: 0.65;
+  cursor: not-allowed !important;
+}
+
+.slot-past-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+.slot-past-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #94A3B8;
+  background: #F1F5F9;
+  border: 1px solid #E2E8F0;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  letter-spacing: -0.01em;
 }
 
 @keyframes fadeInScale {
@@ -556,7 +584,6 @@
 }
 
 .slot-booked-card {
-  background: linear-gradient(135deg, #059669 0%, #047857 100%);
   color: #FFFFFF;
   border-radius: 8px;
   padding: 0.45rem 0.55rem;
@@ -565,14 +592,62 @@
   justify-content: space-between;
   height: 100%;
   min-height: 66px;
-  box-shadow: 0 2px 4px rgba(5, 150, 105, 0.2);
-  transition: all 0.15s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
 }
 
-.slot-cell.booked:hover .slot-booked-card {
+/* 1. Trạng thái ĐÃ ĐẶT (Sắp diễn ra, chưa đến giờ) */
+.slot-booked-card,
+.slot-booked-card.status-upcoming {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  border: 1px solid rgba(167, 243, 208, 0.35);
+  box-shadow: 0 2px 5px rgba(5, 150, 105, 0.22);
+}
+
+.slot-cell.booked:hover .slot-booked-card.status-upcoming,
+.slot-cell.booked:hover .slot-booked-card:not(.status-in_use):not(.status-completed) {
   transform: translateY(-1px);
-  box-shadow: 0 4px 10px rgba(5, 150, 105, 0.35);
-  filter: brightness(1.04);
+  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.38);
+  filter: brightness(1.05);
+}
+
+/* 2. Trạng thái ĐANG SỬ DỤNG (Đến giờ đá - Live Sport Pulse) */
+.slot-booked-card.status-in_use {
+  background: linear-gradient(135deg, #1D4ED8 0%, #2563EB 50%, #3B82F6 100%);
+  border: 1.5px solid #93C5FD;
+  box-shadow: 0 0 12px rgba(37, 99, 235, 0.42), 0 2px 6px rgba(0, 0, 0, 0.12);
+  animation: liveCardGlow 2.5s infinite ease-in-out;
+}
+
+@keyframes liveCardGlow {
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(37, 99, 235, 0.35), 0 2px 5px rgba(0, 0, 0, 0.1);
+  }
+  50% {
+    box-shadow: 0 0 16px rgba(59, 130, 246, 0.6), 0 2px 8px rgba(0, 0, 0, 0.15);
+  }
+}
+
+.slot-cell.booked:hover .slot-booked-card.status-in_use {
+  transform: translateY(-1px);
+  box-shadow: 0 0 18px rgba(37, 99, 235, 0.65), 0 4px 12px rgba(0, 0, 0, 0.18);
+  filter: brightness(1.06);
+}
+
+/* 3. Trạng thái ĐÃ XONG (Hết giờ đá / Quá khứ) */
+.slot-booked-card.status-completed {
+  background: linear-gradient(135deg, #64748B 0%, #475569 100%);
+  border: 1px solid rgba(203, 213, 225, 0.28);
+  box-shadow: 0 1px 3px rgba(71, 85, 105, 0.18);
+  opacity: 0.92;
+}
+
+.slot-cell.booked:hover .slot-booked-card.status-completed {
+  transform: translateY(-1px);
+  opacity: 1;
+  box-shadow: 0 3px 9px rgba(71, 85, 105, 0.32);
 }
 
 .slot-booked-header {
@@ -589,6 +664,70 @@
   padding: 1px 5px;
   border-radius: 4px;
   letter-spacing: 0.02em;
+}
+
+/* Live Operational Badges (Đang sử dụng / Đã xong / Đã đặt) */
+.slot-live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3.5px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 9999px;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  line-height: 1.25;
+}
+
+.slot-live-badge.in-use {
+  background: #FEF2F2;
+  color: #DC2626;
+  border: 1px solid #FECACA;
+  font-weight: 800;
+  box-shadow: 0 1px 3px rgba(220, 38, 38, 0.2);
+}
+
+.slot-live-badge.completed {
+  background: rgba(255, 255, 255, 0.22);
+  color: #F8FAFC;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.slot-live-badge.upcoming {
+  background: rgba(255, 255, 255, 0.2);
+  color: #FFFFFF;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.live-dot-pulse {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #EF4444;
+  display: inline-block;
+  animation: livePing 1.2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+@keyframes livePing {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+  }
+  70% {
+    transform: scale(1.1);
+    box-shadow: 0 0 0 4.5px rgba(239, 68, 68, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+  }
+}
+
+.completed-check-icon {
+  font-weight: 900;
+  font-size: 0.68rem;
+  color: #86EFAC;
 }
 
 .slot-booked-status-dot {

@@ -20,6 +20,7 @@ class MaintenanceScheduleUpdate(BaseModel):
 
 class MaintenanceScheduleResponse(MaintenanceScheduleBase):
     id: int
+    court_name: Optional[str] = None
 
     class Config:
         from_attributes = True

@@ -296,3 +296,188 @@ def test_occupancy_summary_ai_timeout(mock_genai):
     assert response.status_code == 503
     assert "Dịch vụ AI hiện đang quá tải hoặc không thể kết nối, vui lòng thử lại sau." in response.json()["detail"]
 
+@patch("app.ai.gemini_client.genai")
+def test_suggest_slot_ai_timeout_uses_fallback(mock_genai):
+    import google.api_core.exceptions
+    import unittest
+    
+    mock_instance = unittest.mock.MagicMock()
+    mock_instance.generate_content.side_effect = google.api_core.exceptions.DeadlineExceeded("Timeout")
+    mock_genai.GenerativeModel.return_value = mock_instance
+    
+    headers = get_auth_headers()
+    with patch("app.ai.gemini_client.settings.GEMINI_API_KEY", "dummy"):
+        payload = {
+            "court_type_id": 1,
+            "preferred_date": "2026-09-03" # has slot1 available
+        }
+        response = client.post("/ai/suggest-slot", json=payload, headers=headers)
+        
+    assert response.status_code == 200
+    data = response.json()
+    assert data["is_fallback"] is True
+    assert len(data["matched_slots"]) > 0
+    assert "Gợi ý dự phòng" in data["message"]
+    assert "khung giờ trống phù hợp" in data["suggestions_text"]
+
+@patch("app.ai.gemini_client.generate")
+def test_suggest_slot_success_no_fallback(mock_generate):
+    mock_generate.return_value = "1. 🕒 18:00-19:00 | 🏟️ Sân AI 1 | 💵 150,000đ\n   💡 Khung giờ vàng."
+    headers = get_auth_headers()
+    payload = {
+        "court_type_id": 1,
+        "preferred_date": "2026-09-03"
+    }
+    response = client.post("/ai/suggest-slot", json=payload, headers=headers)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["is_fallback"] is False
+    assert len(data["matched_slots"]) == 1
+    assert data["matched_slots"][0]["slot_id"] == 1
+    assert data["matched_slots"][0]["court_name"] == "Sân AI 1"
+    assert data["matched_slots"][0]["price"] == 150000.0
+    assert data["message"] == "Thành công"
+    assert "18:00-19:00" in data["suggestions_text"]
+
+@patch("app.ai.gemini_client.generate")
+def test_suggest_slot_booked_and_blocked_slots_excluded(mock_generate):
+    """Xác minh slot đã bị booked (slot 2, slot 4) hoặc blocked (slot 3) không bao giờ được gợi ý."""
+    headers = get_auth_headers()
+    payload = {
+        "court_type_id": 1,
+        "preferred_date": "2026-09-03"
+    }
+    response = client.post("/ai/suggest-slot", json=payload, headers=headers)
+    assert response.status_code == 200
+    data = response.json()
+    suggested_slot_ids = [s["slot_id"] for s in data["matched_slots"]]
+    assert 2 not in suggested_slot_ids  # slot 2 is booked (booking confirmed)
+    assert 3 not in suggested_slot_ids  # slot 3 is blocked
+    assert 4 not in suggested_slot_ids  # slot 4 is booked (booking pending)
+    assert 1 in suggested_slot_ids      # slot 1 is available
+
+@patch("app.ai.gemini_client.generate")
+def test_suggest_slot_wrong_court_type_or_date_or_time_excluded(mock_generate):
+    """Xác minh sai loại sân, sai ngày hoặc ngoài khoảng giờ đều trả về danh sách rỗng."""
+    headers = get_auth_headers()
+    
+    # 1. Sai loại sân
+    res1 = client.post("/ai/suggest-slot", json={"court_type_id": 999, "preferred_date": "2026-09-03"}, headers=headers)
+    assert res1.status_code == 200
+    assert res1.json()["matched_slots"] == []
+    assert res1.json()["message"] == "Hiện không còn khung giờ trống phù hợp"
+
+    # 2. Sai ngày
+    res2 = client.post("/ai/suggest-slot", json={"court_type_id": 1, "preferred_date": "2026-12-31"}, headers=headers)
+    assert res2.status_code == 200
+    assert res2.json()["matched_slots"] == []
+
+    # 3. Ngoài khoảng giờ (slot 1 là 18:00-19:00, tìm từ 20:00 trở đi)
+    res3 = client.post("/ai/suggest-slot", json={
+        "court_type_id": 1,
+        "preferred_date": "2026-09-03",
+        "preferred_start_time": "20:00:00"
+    }, headers=headers)
+    assert res3.status_code == 200
+    assert res3.json()["matched_slots"] == []
+
+@patch("app.ai.gemini_client.generate")
+def test_suggest_slot_maintenance_court_excluded(mock_generate):
+    """Xác minh sân đang có lịch bảo trì vào preferred_date sẽ bị loại trừ."""
+    db = TestingSessionLocal()
+    from app.models.maintenance_schedule import MaintenanceSchedule
+    # Thêm lịch bảo trì cho sân 1 vào ngày 2026-09-03
+    maint = MaintenanceSchedule(court_id=1, start_date=date(2026, 9, 1), end_date=date(2026, 9, 5), status="in_progress", reason="Bảo trì mặt cỏ")
+    db.add(maint)
+    db.commit()
+    
+    headers = get_auth_headers()
+    try:
+        response = client.post("/ai/suggest-slot", json={"court_type_id": 1, "preferred_date": "2026-09-03"}, headers=headers)
+        assert response.status_code == 200
+        assert response.json()["matched_slots"] == []
+        assert response.json()["message"] == "Hiện không còn khung giờ trống phù hợp"
+    finally:
+        db.delete(maint)
+        db.commit()
+        db.close()
+
+@patch("app.ai.gemini_client.generate")
+def test_suggest_slot_hallucinated_slot_discarded(mock_generate):
+    """Xác minh slot do Gemini tự bịa ra (không tồn tại trong DB) bị loại bỏ hoàn toàn."""
+    # Gemini sinh 1 slot thật (18:00-19:00) và 1 slot ảo (23:00-24:00 Sân Ảo)
+    mock_generate.return_value = (
+        "1. 🕒 18:00-19:00 | 🏟️ Sân AI 1 | 💵 150,000đ\n"
+        "   💡 Slot có thật trong DB.\n"
+        "2. 🕒 23:00-24:00 | 🏟️ Sân Ảo Bịa | 💵 500,000đ\n"
+        "   💡 Slot bịa không có trong DB."
+    )
+    headers = get_auth_headers()
+    payload = {
+        "court_type_id": 1,
+        "preferred_date": "2026-09-03"
+    }
+    response = client.post("/ai/suggest-slot", json=payload, headers=headers)
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["matched_slots"]) == 1
+    assert data["matched_slots"][0]["slot_id"] == 1
+    # Slot ảo 23:00-24:00 không xuất hiện trong matched_slots hoặc text
+    assert "23:00-24:00" not in data["suggestions_text"]
+    assert "Sân Ảo Bịa" not in data["suggestions_text"]
+
+@patch("app.ai.gemini_client.generate")
+def test_suggest_slot_enforces_database_price_and_names(mock_generate):
+    """Xác minh giá tiền và tên sân trong gợi ý luôn lấy từ bản ghi database, không tin số liệu model bịa."""
+    # Gemini sinh giá 999,999đ và tên sai
+    mock_generate.return_value = (
+        "1. 🕒 18:00-19:00 | 🏟️ Tên AI Tự Nghĩ | 💵 999,999đ\n"
+        "   💡 Lý do."
+    )
+    headers = get_auth_headers()
+    payload = {
+        "court_type_id": 1,
+        "preferred_date": "2026-09-03"
+    }
+    response = client.post("/ai/suggest-slot", json=payload, headers=headers)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["matched_slots"][0]["price"] == 150000.0
+    assert data["matched_slots"][0]["court_name"] == "Sân AI 1"
+    assert "150,000đ" in data["suggestions_text"]
+    assert "999,999" not in data["suggestions_text"]
+
+@patch("app.ai.gemini_client.generate")
+def test_suggest_slot_unparseable_ai_response_triggers_fallback(mock_generate):
+    """Xác minh khi Gemini trả về văn bản không chứa khung giờ hợp lệ, hệ thống tự động fallback về DB thật."""
+    mock_generate.return_value = "Xin chào, tôi là trợ lý ảo nhưng hôm nay tôi không thể tìm được khung giờ nào cho bạn."
+    headers = get_auth_headers()
+    payload = {
+        "court_type_id": 1,
+        "preferred_date": "2026-09-03"
+    }
+    response = client.post("/ai/suggest-slot", json=payload, headers=headers)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["is_fallback"] is True
+    assert "Gợi ý dự phòng từ hệ thống" in data["message"]
+    assert len(data["matched_slots"]) == 1
+    assert data["matched_slots"][0]["slot_id"] == 1
+    assert "📌 Khung giờ thực tế còn trống trong hệ thống" in data["suggestions_text"]
+
+def test_booking_conflict_on_unavailable_slot_prevented():
+    """Xác minh cơ chế ngăn đặt trùng booking trên slot không khả dụng (slot 2 đã có booking)."""
+    headers = get_auth_headers()
+    booking_payload = {
+        "customer_id": 1,
+        "court_id": 1,
+        "time_slot_id": 2,  # slot 2 is booked
+        "deposit_amount": 0.0,
+        "note": "Đặt trùng thử nghiệm"
+    }
+
+    # Đặt trên slot 2 -> Xảy ra xung đột (409 Conflict)
+    res = client.post("/bookings/", json=booking_payload, headers=headers)
+    assert res.status_code == 409
+    assert "Khung giờ vừa được đặt" in res.json()["detail"]
+

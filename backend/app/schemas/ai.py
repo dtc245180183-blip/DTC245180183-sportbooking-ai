@@ -11,7 +11,9 @@ class SuggestSlotRequest(BaseModel):
 class SuggestSlotResponse(BaseModel):
     suggestions_text: Optional[str] = None
     matched_slots: List[Dict[str, Any]] = []
+    booked_slots: List[Dict[str, Any]] = []
     message: Optional[str] = None
+    is_fallback: Optional[bool] = False
 
 from typing import Literal
 
