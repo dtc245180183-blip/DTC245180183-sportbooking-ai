@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Bell } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLocation } from 'react-router-dom';
+import NotificationPopover from './NotificationPopover';
 import './Topbar.css';
 
 const VN_TZ = 'Asia/Ho_Chi_Minh';
@@ -37,6 +38,8 @@ export default function Topbar() {
   const currentPage = PAGE_LABELS[location.pathname] || 'SportBooking';
 
   const [now, setNow] = useState(getNowVN());
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   // Cập nhật đồng hồ mỗi giây — theo giờ Việt Nam
   useEffect(() => {
@@ -66,10 +69,28 @@ export default function Topbar() {
         <div className="topbar-greeting">
           <span className="greeting-text">{getGreetingVN(now)}, <strong>{user?.full_name?.split(' ').pop()}</strong> 👋</span>
         </div>
-        <button className="topbar-icon-btn" title="Thông báo" aria-label="Thông báo">
-          <Bell size={18} />
-          <span className="notif-dot" />
-        </button>
+
+        {/* Nút chuông thông báo & Popover */}
+        <div style={{ position: 'relative' }}>
+          <button 
+            className={`topbar-icon-btn ${isNotifOpen ? 'active' : ''}`} 
+            title="Thông báo hệ thống" 
+            aria-label="Thông báo"
+            onClick={() => setIsNotifOpen(prev => !prev)}
+          >
+            <Bell size={18} />
+            {unreadCount > 0 ? (
+              <span className="notif-badge-pill">{unreadCount > 9 ? '9+' : unreadCount}</span>
+            ) : null}
+          </button>
+
+          <NotificationPopover 
+            isOpen={isNotifOpen} 
+            onClose={() => setIsNotifOpen(false)} 
+            onCountChange={setUnreadCount} 
+          />
+        </div>
+
         <div className="topbar-avatar" style={{
           background: user?.role === 'admin'
             ? 'linear-gradient(135deg, #f97316, #ef4444)'

@@ -9,6 +9,7 @@ class BookingBase(BaseModel):
     staff_id: int
     status: str = Field(default="pending", pattern="^(pending|confirmed|cancelled|completed)$")
     deposit_amount: float = 0.0
+    deposit_forfeited: bool = False
     total_amount: float
     note: Optional[str] = None
 
@@ -19,6 +20,7 @@ class BookingCreateRequest(BaseModel):
     customer_id: int
     time_slot_id: int
     deposit_amount: float = Field(default=0.0, ge=0.0)
+    deposit_method: Optional[str] = "cash"
     note: Optional[str] = None
 
 class BookingCancelRequest(BaseModel):
@@ -40,6 +42,7 @@ class BookingRescheduleResponse(BaseModel):
 class BookingUpdate(BaseModel):
     status: Optional[str] = Field(None, pattern="^(pending|confirmed|cancelled|completed)$")
     deposit_amount: Optional[float] = None
+    deposit_forfeited: Optional[bool] = None
     total_amount: Optional[float] = None
     note: Optional[str] = None
 
@@ -70,6 +73,8 @@ class PaymentInfo(BaseModel):
     id: int
     amount: float
     status: str
+    method: Optional[str] = "cash"
+    paid_at: Optional[datetime] = None
 
 class BookingDetailResponse(BookingResponse):
     court: Optional[CourtInfo] = None

@@ -59,6 +59,69 @@ export function formatVNDate(isoStr) {
  * Lấy ngày hiện tại theo giờ VN (dùng cho filter "Hôm nay")
  * Trả về chuỗi YYYY-MM-DD
  */
-export function todayVN() {
-  return new Date().toLocaleDateString('sv-SE', { timeZone: VN_TZ }); // sv-SE cho format YYYY-MM-DD
+export function todayVN(refDate = new Date()) {
+  return refDate.toLocaleDateString('sv-SE', { timeZone: VN_TZ }); // sv-SE cho format YYYY-MM-DD
 }
+
+/**
+ * Lấy tổng số phút từ đầu ngày theo giờ Việt Nam (0 - 1439)
+ */
+export function currentMinutesVN(dateObj = new Date()) {
+  const parts = new Intl.DateTimeFormat('vi-VN', {
+    timeZone: VN_TZ,
+    hour: 'numeric',
+    minute: 'numeric',
+    hour12: false
+  }).formatToParts(dateObj);
+  
+  const h = parseInt(parts.find(p => p.type === 'hour')?.value || '0', 10);
+  const m = parseInt(parts.find(p => p.type === 'minute')?.value || '0', 10);
+  return h * 60 + m;
+}
+
+/**
+ * Xác định trạng thái vận hành thực tế của slot:
+ * - 'in_use': Đang sử dụng (nằm trong khung giờ đá của ngày hôm nay)
+ * - 'completed': Đã xong (hết giờ đá của ngày hôm nay hoặc ngày trong quá khứ)
+ * - 'upcoming': Đã đặt (chưa đến giờ đá ngày hôm nay hoặc ngày tương lai)
+ */
+export function getSlotMatchStatus(slotDate, startTimeStr, endTimeStr, hour = null, refDate = new Date()) {
+  if (!slotDate) return 'unknown';
+
+  const todayStr = todayVN(refDate);
+
+  if (slotDate < todayStr) {
+    return 'completed'; // Ngày trong quá khứ -> Đã xong
+  }
+  if (slotDate > todayStr) {
+    return 'upcoming'; // Ngày trong tương lai -> Đã đặt (chưa tới)
+  }
+
+  // Ngày hôm nay -> So sánh số phút thực tế
+  const nowMin = currentMinutesVN(refDate);
+
+  let startMin = 0;
+  if (startTimeStr) {
+    const [h, m] = String(startTimeStr).slice(0, 5).split(':').map(Number);
+    startMin = h * 60 + (m || 0);
+  } else if (hour !== null && hour !== undefined) {
+    startMin = hour * 60;
+  }
+
+  let endMin = startMin + 60;
+  if (endTimeStr) {
+    const [h, m] = String(endTimeStr).slice(0, 5).split(':').map(Number);
+    endMin = h * 60 + (m || 0);
+  } else if (hour !== null && hour !== undefined) {
+    endMin = (hour + 1) * 60;
+  }
+
+  if (nowMin < startMin) {
+    return 'upcoming'; // Chưa đến giờ đá -> Đã đặt
+  } else if (nowMin >= startMin && nowMin < endMin) {
+    return 'in_use'; // Đến giờ đá -> Đang sử dụng
+  } else {
+    return 'completed'; // Hết giờ đá -> Đã xong
+  }
+}
+

@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { paymentsAPI, bookingsAPI, customersAPI, courtsAPI } from '../../api';
-import { CreditCard, RefreshCw, Calendar, Filter, X, AlertCircle, ChevronDown, ChevronUp, Trash2, List, Info, ShieldCheck, CheckCircle, Clock, XCircle, Lock, Wallet } from 'lucide-react';
+import { CreditCard, RefreshCw, Calendar, Filter, X, AlertCircle, ChevronDown, ChevronUp, Trash2, List, Info, ShieldCheck, CheckCircle, Clock, XCircle, Lock, Wallet, Shield, TrendingUp, BarChart2, PieChart } from 'lucide-react';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip as ChartTooltip, Cell, CartesianGrid } from 'recharts';
 import { useToast } from '../../components/ui/Toast';
 import { Button, Card, Badge, Modal, Input, Select, Table, ConfirmModal, Pagination } from '../../components/ui';
 import { formatVNDateTime, todayVN } from '../../utils/datetime';
@@ -41,6 +42,13 @@ export default function Payments() {
   const [detailFilterDeposit, setDetailFilterDeposit] = useState(''); // '' | 'has_deposit' | 'no_deposit' | 'paid_full' | 'need_pay'
   const [detailFilterStatus,  setDetailFilterStatus]  = useState(''); // '' | 'confirmed' | 'pending' | 'cancelled'
 
+  // Filter cho tab sổ quỹ tiền cọc
+  const [depositSearch, setDepositSearch] = useState('');
+  const debouncedDepositSearch = useDebounce(depositSearch, 300);
+  const [depositFilterStatus, setDepositFilterStatus] = useState('');
+  const [depositPage, setDepositPage] = useState(1);
+  const [depositPageSize, setDepositPageSize] = useState(10);
+
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -77,16 +85,16 @@ export default function Payments() {
     return c?.name || b.court?.name || `Sân#${b.court_id}`;
   };
   /**
-   * Tổng tiền đã thu của 1 booking = tiền cọc (deposit_amount) + tổng payments đã 'paid'
-   * deposit_amount lưu trực tiếp trong booking, không tạo payment record riêng
+   * Tổng tiền đã thu của 1 booking = tổng payments đã 'paid'
+   * (nếu chưa có payment nào mà booking có deposit_amount thì fallback sang deposit_amount)
    */
   const paidForBooking = (bookingId) => {
     const b = bookings.find(bk => bk.id === bookingId);
-    const deposit      = b?.deposit_amount || 0;
     const paymentsPaid = payments
       .filter(p => p.booking_id === bookingId && p.status === 'paid')
       .reduce((s, p) => s + p.amount, 0);
-    return deposit + paymentsPaid;
+    if (paymentsPaid > 0) return paymentsPaid;
+    return b?.deposit_amount || 0;
   };
 
   // ── "Booking còn nợ" ─────────────────────────────────
@@ -130,36 +138,39 @@ export default function Payments() {
   }, [allBookingDetails, detailFilterDeposit, detailFilterStatus]);
 
   // ── Summary tổng (toàn bộ, không theo filter) ────────
-  // Tổng cọc tất cả booking đã ghi nhận vào quỹ
-  const totalAllDeposits = useMemo(() => {
-    return bookings.reduce((s, b) => s + (b.deposit_amount || 0), 0);
-  }, [bookings]);
-
-  // Cọc giữ lại từ các booking đã hủy (chưa có giao dịch refunded)
-  const retainedDeposits = useMemo(() => {
-    return bookings
-      .filter(b => b.status === 'cancelled' && (b.deposit_amount || 0) > 0)
-      .reduce((s, b) => {
-        const hasRefund = payments.some(p => p.booking_id === b.id && p.status === 'refunded');
-        return hasRefund ? s : s + (b.deposit_amount || 0);
-      }, 0);
-  }, [bookings, payments]);
-
-  // Danh sách các booking đã hủy đang giữ cọc
+  // Danh sách các booking đã hủy đang giữ cọc (chưa hoàn tiền và chưa chốt phạt cọc)
   const cancelledBookingsWithDeposit = useMemo(() => {
     return bookings.filter(b => {
-      if (b.status !== 'cancelled' || !(b.deposit_amount > 0)) return false;
+      if (b.status !== 'cancelled' || !(b.deposit_amount > 0) || b.deposit_forfeited) return false;
       return !payments.some(p => p.booking_id === b.id && p.status === 'refunded');
     });
   }, [bookings, payments]);
+
+  // Cọc giữ lại từ các booking đã hủy (chưa có giao dịch refunded và chưa chốt)
+  const retainedDeposits = useMemo(() => {
+    return cancelledBookingsWithDeposit.reduce((s, b) => s + (b.deposit_amount || 0), 0);
+  }, [cancelledBookingsWithDeposit]);
 
   // Tổng thanh toán paid từ bảng payments
   const totalPaymentsPaid = useMemo(() => {
     return payments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0);
   }, [payments]);
 
-  // Đã thu (tổng) = thanh toán paid + tổng cọc ban đầu
-  const totalPaid = totalPaymentsPaid + totalAllDeposits;
+  // Tổng cọc tất cả booking đã ghi nhận vào quỹ
+  const totalAllDeposits = useMemo(() => {
+    return bookings.reduce((s, b) => s + (b.deposit_amount || 0), 0);
+  }, [bookings]);
+
+  // Khoản cọc của các đơn cũ chưa sync payment
+  const unrecordedDeposits = useMemo(() => {
+    return bookings.reduce((sum, b) => {
+      const hasPayment = payments.some(p => p.booking_id === b.id && p.status === 'paid');
+      return (!hasPayment && b.deposit_amount > 0) ? sum + b.deposit_amount : sum;
+    }, 0);
+  }, [bookings, payments]);
+
+  // Đã thu (tổng) = thanh toán paid (đã bao gồm cọc) + cọc cũ chưa sync
+  const totalPaid = totalPaymentsPaid + unrecordedDeposits;
 
   // Đã hoàn trả (tổng) = các giao dịch refunded
   const totalRefunded = useMemo(() => {
@@ -201,6 +212,147 @@ export default function Payments() {
     return filteredBookingDetails.slice(start, start + detailPageSize);
   }, [filteredBookingDetails, detailPage, detailPageSize]);
 
+  // ── Sổ quỹ tiền cọc & Phân tích xu hướng ───────────────────
+  const depositLedger = useMemo(() => {
+    return bookings
+      .filter(b => (b.deposit_amount || 0) > 0)
+      .map(b => {
+        const dep = b.deposit_amount || 0;
+        const refundPayment = payments.find(p => p.booking_id === b.id && p.status === 'refunded');
+        const hasRefund = Boolean(refundPayment);
+        
+        let depositStatus = 'pending_active';
+        let depositStatusLabel = 'Đang giữ (Chờ giờ chơi)';
+        let depositBadgeColor = '#7C3AED';
+        let depositBadgeBg = '#F5F3FF';
+        let depositBadgeBorder = '#DDD6FE';
+
+        if (b.status === 'completed') {
+          depositStatus = 'completed';
+          depositStatusLabel = 'Kết chuyển tiền sân';
+          depositBadgeColor = '#15803D';
+          depositBadgeBg = '#DCFCE7';
+          depositBadgeBorder = '#BBF7D0';
+        } else if (b.status === 'cancelled') {
+          if (hasRefund) {
+            depositStatus = 'refunded';
+            depositStatusLabel = 'Đã hoàn trả khách';
+            depositBadgeColor = '#1D4ED8';
+            depositBadgeBg = '#DBEAFE';
+            depositBadgeBorder = '#BFDBFE';
+          } else if (b.deposit_forfeited) {
+            depositStatus = 'forfeited';
+            depositStatusLabel = 'Đã giữ lại (Phạt hủy)';
+            depositBadgeColor = '#B45309';
+            depositBadgeBg = '#FEF3C7';
+            depositBadgeBorder = '#FDE68A';
+          } else {
+            depositStatus = 'pending_decision';
+            depositStatusLabel = 'Đang giữ (Chờ xử lý)';
+            depositBadgeColor = '#D97706';
+            depositBadgeBg = '#FFFBEB';
+            depositBadgeBorder = '#FCD34D';
+          }
+        }
+
+        return {
+          ...b,
+          deposit: dep,
+          hasRefund,
+          refundPayment,
+          depositStatus,
+          depositStatusLabel,
+          depositBadgeColor,
+          depositBadgeBg,
+          depositBadgeBorder,
+          createdDate: b.created_at ? b.created_at.slice(0, 10) : '',
+        };
+      })
+      .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+  }, [bookings, payments]);
+
+  const depositStats = useMemo(() => {
+    let totalAmount = 0;
+    let completedAmount = 0;
+    let refundedAmount = 0;
+    let forfeitedAmount = 0;
+    let pendingDecisionAmount = 0;
+    let activePendingAmount = 0;
+
+    let completedCount = 0;
+    let refundedCount = 0;
+    let forfeitedCount = 0;
+    let pendingDecisionCount = 0;
+    let activePendingCount = 0;
+
+    depositLedger.forEach(item => {
+      totalAmount += item.deposit;
+      if (item.depositStatus === 'completed') {
+        completedAmount += item.deposit;
+        completedCount++;
+      } else if (item.depositStatus === 'refunded') {
+        refundedAmount += item.deposit;
+        refundedCount++;
+      } else if (item.depositStatus === 'forfeited') {
+        forfeitedAmount += item.deposit;
+        forfeitedCount++;
+      } else if (item.depositStatus === 'pending_decision') {
+        pendingDecisionAmount += item.deposit;
+        pendingDecisionCount++;
+      } else {
+        activePendingAmount += item.deposit;
+        activePendingCount++;
+      }
+    });
+
+    return {
+      totalAmount,
+      totalCount: depositLedger.length,
+      completedAmount,
+      completedCount,
+      refundedAmount,
+      refundedCount,
+      forfeitedAmount,
+      forfeitedCount,
+      pendingDecisionAmount,
+      pendingDecisionCount,
+      activePendingAmount,
+      activePendingCount,
+      completedRate: totalAmount > 0 ? Math.round((completedAmount / totalAmount) * 100) : 0,
+      refundedRate: totalAmount > 0 ? Math.round((refundedAmount / totalAmount) * 100) : 0,
+      forfeitedRate: totalAmount > 0 ? Math.round((forfeitedAmount / totalAmount) * 100) : 0,
+      pendingRate: totalAmount > 0 ? Math.round(((pendingDecisionAmount + activePendingAmount) / totalAmount) * 100) : 0,
+    };
+  }, [depositLedger]);
+
+  const depositCategoryData = useMemo(() => {
+    return [
+      { name: 'Đã hoàn trả', amount: depositStats.refundedAmount, count: depositStats.refundedCount, color: '#3B82F6' },
+      { name: 'Đã giữ lại (phạt)', amount: depositStats.forfeitedAmount, count: depositStats.forfeitedCount, color: '#F59E0B' },
+      { name: 'Kết chuyển sân', amount: depositStats.completedAmount, count: depositStats.completedCount, color: '#10B981' },
+      ...(depositStats.pendingDecisionAmount > 0 ? [{ name: 'Chờ xử lý', amount: depositStats.pendingDecisionAmount, count: depositStats.pendingDecisionCount, color: '#EF4444' }] : []),
+    ];
+  }, [depositStats]);
+
+  const filteredDepositLedger = useMemo(() => {
+    return depositLedger.filter(item => {
+      if (depositFilterStatus && item.depositStatus !== depositFilterStatus) return false;
+      if (debouncedDepositSearch) {
+        const q = debouncedDepositSearch.toLowerCase().trim();
+        const cust = (getCustomerName(item.id) || '').toLowerCase();
+        const court = (getCourtName(item.id) || '').toLowerCase();
+        const idMatch = String(item.id) === q || `#${item.id}` === q;
+        if (!cust.includes(q) && !court.includes(q) && !idMatch) return false;
+      }
+      return true;
+    });
+  }, [depositLedger, depositFilterStatus, debouncedDepositSearch, customers, courts]);
+
+  const paginatedDepositLedger = useMemo(() => {
+    const start = (depositPage - 1) * depositPageSize;
+    return filteredDepositLedger.slice(start, start + depositPageSize);
+  }, [filteredDepositLedger, depositPage, depositPageSize]);
+
   const hasFilter = Boolean(filterDate || filterStatus || filterMethod || debouncedSearch);
   const clearFilters = () => { 
     setFilterDate(''); 
@@ -237,6 +389,18 @@ export default function Payments() {
         return;
       }
     }
+
+    // Chặn hoàn tiền vượt quá số tiền khách đã thực trả
+    if (b && form.status === 'refunded') {
+      const paid = paidForBooking(parseInt(form.booking_id));
+      const refunded = payments.filter(p => p.booking_id === parseInt(form.booking_id) && p.status === 'refunded').reduce((s, p) => s + p.amount, 0);
+      const maxRefundable = Math.max(0, paid - refunded);
+      if (parseFloat(form.amount) > maxRefundable) {
+        showToast({ type: 'warning', message: `Số tiền hoàn (${parseFloat(form.amount).toLocaleString()}đ) vượt quá số tiền tối đa có thể hoàn (${maxRefundable.toLocaleString()}đ)!` });
+        return;
+      }
+    }
+
     try {
       await paymentsAPI.create({
         booking_id: parseInt(form.booking_id),
@@ -247,6 +411,17 @@ export default function Payments() {
       });
       showToast({ type: 'success', message: form.status === 'refunded' ? 'Đã ghi nhận hoàn tiền thành công' : 'Tạo giao dịch thành công' });
       setShowModal(false);
+      fetchAll();
+      bookingsAPI.getAll({}).then(setBookings).catch(() => {});
+    } catch (err) {
+      showToast({ type: 'error', message: err.response?.data?.detail || 'Thao tác thất bại' });
+    }
+  };
+
+  const handleForfeitDeposit = async (bookingId) => {
+    try {
+      await bookingsAPI.forfeitDeposit(bookingId);
+      showToast({ type: 'success', message: `Đã chốt giữ cọc cho đơn #${bookingId} vào doanh thu!` });
       fetchAll();
       bookingsAPI.getAll({}).then(setBookings).catch(() => {});
     } catch (err) {
@@ -318,7 +493,11 @@ export default function Payments() {
       const dep = (b.deposit_amount && b.deposit_amount > 0) ? b.deposit_amount : (refundPayment?.amount || 0);
       let tag = '';
       if (isCancelled) {
-        tag = hasRefund ? ' [Đã hủy - Đã hoàn cọc]' : (dep > 0 ? ` [Đã hủy - Cọc giữ lại: ${dep.toLocaleString()}đ]` : ' [Đã hủy]');
+        tag = hasRefund
+          ? ' [Đã hủy - Đã hoàn cọc]'
+          : (b.deposit_forfeited
+              ? ` [Đã hủy - Đã giữ cọc: ${dep.toLocaleString()}đ]`
+              : (dep > 0 ? ` [Đã hủy - Cọc giữ lại: ${dep.toLocaleString()}đ]` : ' [Đã hủy]'));
       }
       return {
         value: b.id,
@@ -418,21 +597,23 @@ export default function Payments() {
                 <RefreshCw size={10} /> Đã hoàn
               </div>
             )}
+            {r.status === 'cancelled' && r.deposit_forfeited && !r.hasRefund && (
+              <div style={{ fontSize: '0.7rem', color: '#B45309', marginTop: 2, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 2 }}>
+                <Lock size={10} /> Đã giữ cọc
+              </div>
+            )}
           </div>
         );
       }
     },
     { key: 'paid',       label: 'Đã thu tổng', align: 'right',
       render: (v, r) => {
-        const paidFromPayments = v - r.deposit;
         return (
           <div style={{ textAlign: 'right' }}>
-            <span style={{ color: '#059669', fontWeight: 600 }}>{v.toLocaleString()}đ</span>
-            {r.deposit > 0 && (
-              <div style={{ fontSize: '0.7rem', color: '#64748B', marginTop: 1 }}>
-                {paidFromPayments > 0
-                  ? `cọc ${r.deposit.toLocaleString()} + TT ${paidFromPayments.toLocaleString()}`
-                  : `chỉ cọc ${r.deposit.toLocaleString()}đ`}
+            <span style={{ color: '#059669', fontWeight: 600 }}>{(v || 0).toLocaleString()}đ</span>
+            {r.status === 'cancelled' && r.deposit > 0 && !r.hasRefund && (
+              <div style={{ fontSize: '0.7rem', color: '#B45309', marginTop: 1 }}>
+                ({r.deposit_forfeited ? 'cọc đã giữ' : 'cọc giữ lại'})
               </div>
             )}
           </div>
@@ -459,13 +640,35 @@ export default function Payments() {
     { key: '_action',    label: '', align: 'right',
       render: (_, r) => {
         if (r.status === 'cancelled') {
-          if (r.deposit > 0 && !r.hasRefund) {
+          if (r.deposit > 0) {
+            if (r.hasRefund) {
+              return (
+                <span style={{ fontSize: '0.75rem', color: '#1D4ED8', background: '#DBEAFE', border: '1px solid #BFDBFE', borderRadius: 6, padding: '3px 8px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <RefreshCw size={11} /> Đã hoàn cọc
+                </span>
+              );
+            }
+            if (r.deposit_forfeited) {
+              return (
+                <span style={{ fontSize: '0.75rem', color: '#B45309', background: '#FEF3C7', border: '1px solid #FDE68A', borderRadius: 6, padding: '3px 8px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <Lock size={11} /> Đã giữ cọc
+                </span>
+              );
+            }
             return (
-              <Button variant="secondary" size="sm" icon={<RefreshCw size={12} />}
-                style={{ borderColor: '#FDE68A', color: '#B45309', background: '#FEF3C7', fontSize: '0.75rem' }}
-                onClick={() => openRefundForCancelled(r)}>
-                Hoàn cọc
-              </Button>
+              <div style={{ display: 'flex', gap: '0.375rem', justifyContent: 'flex-end' }}>
+                <Button variant="secondary" size="sm" icon={<RefreshCw size={12} />}
+                  style={{ borderColor: '#BAE6FD', color: '#0284C7', background: '#F0F9FF', fontSize: '0.75rem' }}
+                  onClick={() => openRefundForCancelled(r)}>
+                  Hoàn cọc
+                </Button>
+                <Button variant="secondary" size="sm" icon={<Lock size={12} />}
+                  style={{ borderColor: '#FDE68A', color: '#B45309', background: '#FEF3C7', fontSize: '0.75rem' }}
+                  onClick={() => handleForfeitDeposit(r.id)}
+                  title="Chốt giữ cọc vào doanh thu sân">
+                  Giữ cọc
+                </Button>
+              </div>
             );
           }
           return null;
@@ -495,17 +698,13 @@ export default function Payments() {
     { key: 'total_amount',label: 'Tổng tiền',  align: 'right', render: v => `${(v || 0).toLocaleString()}đ` },
     { key: 'paid',        label: 'Đã thu',     align: 'right',
       render: (v, r) => {
-        const deposit      = r.deposit_amount || 0;
-        const paymentsPaid = v - deposit;  // v = paid đã bao gồm deposit
+        const deposit = r.deposit_amount || 0;
         return (
           <div style={{ textAlign: 'right' }}>
-            <span style={{ color: '#059669', fontWeight: 600 }}>{v.toLocaleString()}đ</span>
+            <span style={{ color: '#059669', fontWeight: 600 }}>{(v || 0).toLocaleString()}đ</span>
             {deposit > 0 && (
               <div style={{ fontSize: '0.7rem', color: '#64748B', marginTop: 1 }}>
-                {paymentsPaid > 0
-                  ? `cọc ${deposit.toLocaleString()} + TT ${paymentsPaid.toLocaleString()}`
-                  : `cọc ${deposit.toLocaleString()}đ`
-                }
+                (đã gồm cọc {deposit.toLocaleString()}đ)
               </div>
             )}
           </div>
@@ -520,6 +719,77 @@ export default function Payments() {
           Thu tiền
         </Button>
       )},
+  ];
+
+  // ── Deposit columns ──────────────────────────────────
+  const depositColumns = [
+    { key: 'id', label: 'Booking', width: '85px', render: v => <strong style={{ color: '#0F172A' }}>#{v}</strong> },
+    { key: '_customer', label: 'Khách hàng', render: (_, r) => getCustomerName(r.id) },
+    { key: '_court', label: 'Sân', render: (_, r) => getCourtName(r.id) },
+    { key: 'total_amount', label: 'Tổng tiền đơn', align: 'right', render: v => `${(v || 0).toLocaleString()}đ` },
+    { key: 'deposit', label: 'Tiền cọc', align: 'right',
+      render: v => (
+        <span style={{ background: '#FEF3C7', color: '#B45309', border: '1px solid #FDE68A',
+          borderRadius: 6, padding: '2px 8px', fontSize: '0.82rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+          <Lock size={11} /> {v.toLocaleString()}đ
+        </span>
+      )
+    },
+    { key: 'created_at', label: 'Ngày cọc', render: v => formatVNDateTime(v) },
+    { key: 'depositStatus', label: 'Trạng thái cọc',
+      render: (_, r) => (
+        <span style={{
+          background: r.depositBadgeBg, color: r.depositBadgeColor, border: `1px solid ${r.depositBadgeBorder}`,
+          borderRadius: 6, padding: '3px 9px', fontSize: '0.78rem', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap'
+        }}>
+          {r.depositStatus === 'completed' && <CheckCircle size={12} />}
+          {r.depositStatus === 'refunded' && <RefreshCw size={12} />}
+          {r.depositStatus === 'forfeited' && <Lock size={12} />}
+          {r.depositStatus === 'pending_decision' && <AlertCircle size={12} />}
+          {r.depositStatus === 'pending_active' && <Clock size={12} />}
+          {r.depositStatusLabel}
+        </span>
+      )
+    },
+    { key: '_actions', label: '', align: 'right',
+      render: (_, r) => {
+        if (r.depositStatus === 'pending_decision') {
+          return (
+            <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+              <Button variant="secondary" size="sm" icon={<RefreshCw size={11} />}
+                style={{ fontSize: '0.72rem', padding: '3px 8px', background: '#DBEAFE', color: '#1D4ED8', borderColor: '#BFDBFE' }}
+                onClick={() => openRefundForCancelled(r)}>
+                Hoàn cọc
+              </Button>
+              <Button variant="secondary" size="sm" icon={<Lock size={11} />}
+                style={{ fontSize: '0.72rem', padding: '3px 8px', background: '#FEF3C7', color: '#B45309', borderColor: '#FDE68A' }}
+                onClick={() => handleForfeitDeposit(r.id)}>
+                Chốt cọc
+              </Button>
+            </div>
+          );
+        }
+        if (r.depositStatus === 'refunded') {
+          return (
+            <span style={{ fontSize: '0.75rem', color: '#2563EB', display: 'inline-flex', alignItems: 'center', gap: 3, fontWeight: 500 }}>
+              <RefreshCw size={11} /> Đã hoàn
+            </span>
+          );
+        }
+        if (r.depositStatus === 'forfeited') {
+          return (
+            <span style={{ fontSize: '0.75rem', color: '#B45309', display: 'inline-flex', alignItems: 'center', gap: 3, fontWeight: 500 }}>
+              <Lock size={11} /> Đã giữ
+            </span>
+          );
+        }
+        return (
+          <span style={{ fontSize: '0.75rem', color: '#059669', display: 'inline-flex', alignItems: 'center', gap: 3, fontWeight: 500 }}>
+            <CheckCircle size={11} /> Đã kết chuyển
+          </span>
+        );
+      }
+    }
   ];
 
 
@@ -569,12 +839,20 @@ export default function Payments() {
                 </span>
               )}
             </button>
+            <button style={tabStyle(activeTab === 'deposits')} onClick={() => setActiveTab('deposits')}>
+              <ShieldCheck size={14} /> Sổ quỹ & Xu hướng tiền cọc
+              <span style={{ background: '#F59E0B', color: '#fff', borderRadius: 999,
+                padding: '0 6px', fontSize: '0.7rem', fontWeight: 700 }}>
+                {depositLedger.length}
+              </span>
+            </button>
           </div>
         );
       })()}
 
-      {/* ── Summary cards ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
+      {/* ── Summary cards (chỉ hiển thị ở tab Giao dịch & Chi tiết đơn, ẩn ở mục đặt cọc) ── */}
+      {activeTab !== 'deposits' && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
         {/* Đã thu */}
         <Card padding="md" style={{ borderTop: '3px solid #10B981' }}>
           <p style={{ fontSize: '0.82rem', color: '#475569', marginBottom: '0.375rem', display: 'flex', alignItems: 'center', gap: 5, fontWeight: 600 }}>
@@ -583,7 +861,7 @@ export default function Payments() {
           <p style={{ fontSize: '1.6rem', fontWeight: 700, color: '#0F172A', margin: 0 }}>{totalPaid.toLocaleString()}đ</p>
           <div style={{ marginTop: 4 }}>
             <p style={{ fontSize: '0.72rem', color: '#64748B', margin: '2px 0 0' }}>
-              Gồm TT: {totalPaymentsPaid.toLocaleString()}đ + Cọc: {totalAllDeposits.toLocaleString()}đ
+              Dòng tiền từ {payments.filter(p => p.status === 'paid').length} giao dịch đã thanh toán
             </p>
             {retainedDeposits > 0 && (
               <p style={{ fontSize: '0.74rem', color: '#B45309', fontWeight: 600, margin: '4px 0 0', display: 'flex', alignItems: 'center', gap: 4 }}
@@ -646,9 +924,10 @@ export default function Payments() {
           </p>
         </Card>
       </div>
+      )}
 
       {/* ── Banner: Các đơn hủy đang giữ cọc (cho phép người quản lý hoàn tiền cọc bất cứ lúc nào) ── */}
-      {cancelledBookingsWithDeposit.length > 0 && (
+      {activeTab !== 'deposits' && cancelledBookingsWithDeposit.length > 0 && (
         <Card padding="md" style={{ marginBottom: '1.5rem', background: '#FFFBEB', border: '1px solid #FDE68A' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -664,16 +943,27 @@ export default function Payments() {
             </div>
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
               {cancelledBookingsWithDeposit.map(cb => (
-                <Button
-                  key={cb.id}
-                  variant="secondary"
-                  size="sm"
-                  icon={<RefreshCw size={12} />}
-                  style={{ borderColor: '#FCD34D', color: '#92400E', background: '#FEF3C7', fontSize: '0.78rem' }}
-                  onClick={() => openRefundForCancelled(cb)}
-                >
-                  Hoàn cọc #{cb.id} ({(cb.deposit_amount || 0).toLocaleString()}đ)
-                </Button>
+                <div key={cb.id} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', background: '#FEF3C7', border: '1px solid #FCD34D', borderRadius: 8, padding: '2px 6px' }}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    icon={<RefreshCw size={12} />}
+                    style={{ color: '#92400E', fontSize: '0.78rem', padding: '0.2rem 0.5rem' }}
+                    onClick={() => openRefundForCancelled(cb)}
+                    title="Hoàn trả tiền cọc cho khách"
+                  >
+                    Hoàn cọc #{cb.id} ({(cb.deposit_amount || 0).toLocaleString()}đ)
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    style={{ color: '#B45309', fontSize: '0.75rem', fontWeight: 600, padding: '0.2rem 0.4rem', borderLeft: '1px solid #FDE68A' }}
+                    onClick={() => handleForfeitDeposit(cb.id)}
+                    title="Chốt phạt cọc và đóng hồ sơ"
+                  >
+                    Chốt cọc
+                  </Button>
+                </div>
               ))}
             </div>
           </div>
@@ -681,7 +971,7 @@ export default function Payments() {
       )}
 
       {/* ── Danh sách booking còn nợ ── */}
-      {debtBookings.length > 0 && showDebtList && (
+      {activeTab !== 'deposits' && debtBookings.length > 0 && showDebtList && (
         <Card padding="none" style={{ marginBottom: '1.5rem', border: '1px solid #FDE68A' }}>
           <div style={{ padding: '0.875rem 1.25rem', borderBottom: '1px solid #FEF3C7', background: '#FFFBEB',
                         display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -861,6 +1151,202 @@ export default function Payments() {
                   pageSize={detailPageSize}
                   onPageChange={setDetailPage}
                   onPageSizeChange={(sz) => { setDetailPageSize(sz); setDetailPage(1); }}
+                />
+              </div>
+            )}
+          </Card>
+        </>
+      )}
+
+      {/* ── TAB 3: Sổ quỹ & Xu hướng tiền cọc ── */}
+      {activeTab === 'deposits' && (
+        <>
+          {/* ── 4 KPI Cards for Deposit ── */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '1.25rem' }}>
+            <Card padding="md" style={{ borderTop: '3px solid #6366F1' }}>
+              <p style={{ fontSize: '0.82rem', color: '#475569', marginBottom: '0.375rem', display: 'flex', alignItems: 'center', gap: 5, fontWeight: 600 }}>
+                <Shield size={14} style={{ color: '#6366F1' }} /> Tổng cọc phát sinh
+              </p>
+              <p style={{ fontSize: '1.5rem', fontWeight: 700, color: '#0F172A', margin: 0 }}>
+                {depositStats.totalAmount.toLocaleString()}đ
+              </p>
+              <p style={{ fontSize: '0.72rem', color: '#64748B', margin: '4px 0 0' }}>
+                Từ {depositStats.totalCount} đơn đặt sân có cọc
+              </p>
+            </Card>
+
+            <Card padding="md" style={{ borderTop: '3px solid #3B82F6' }}>
+              <p style={{ fontSize: '0.82rem', color: '#475569', marginBottom: '0.375rem', display: 'flex', alignItems: 'center', gap: 5, fontWeight: 600 }}>
+                <RefreshCw size={14} style={{ color: '#3B82F6' }} /> Cọc đã hoàn trả
+              </p>
+              <p style={{ fontSize: '1.5rem', fontWeight: 700, color: '#2563EB', margin: 0 }}>
+                {depositStats.refundedAmount.toLocaleString()}đ
+              </p>
+              <p style={{ fontSize: '0.72rem', color: '#64748B', margin: '4px 0 0' }}>
+                {depositStats.refundedCount} đơn hủy đã hoàn lại khách ({depositStats.refundedRate}%)
+              </p>
+            </Card>
+
+            <Card padding="md" style={{ borderTop: '3px solid #F59E0B' }}>
+              <p style={{ fontSize: '0.82rem', color: '#475569', marginBottom: '0.375rem', display: 'flex', alignItems: 'center', gap: 5, fontWeight: 600 }}>
+                <Lock size={14} style={{ color: '#F59E0B' }} /> Cọc đã giữ lại (phạt)
+              </p>
+              <p style={{ fontSize: '1.5rem', fontWeight: 700, color: '#D97706', margin: 0 }}>
+                {depositStats.forfeitedAmount.toLocaleString()}đ
+              </p>
+              <p style={{ fontSize: '0.72rem', color: '#64748B', margin: '4px 0 0' }}>
+                {depositStats.forfeitedCount} đơn hủy phạt cọc ({depositStats.forfeitedRate}%)
+              </p>
+            </Card>
+
+            <Card padding="md" style={{ borderTop: '3px solid #10B981' }}>
+              <p style={{ fontSize: '0.82rem', color: '#475569', marginBottom: '0.375rem', display: 'flex', alignItems: 'center', gap: 5, fontWeight: 600 }}>
+                <CheckCircle size={14} style={{ color: '#10B981' }} /> Kết chuyển tiền sân
+              </p>
+              <p style={{ fontSize: '1.5rem', fontWeight: 700, color: '#059669', margin: 0 }}>
+                {depositStats.completedAmount.toLocaleString()}đ
+              </p>
+              <p style={{ fontSize: '0.72rem', color: '#64748B', margin: '4px 0 0' }}>
+                {depositStats.completedCount} đơn chơi thành công ({depositStats.completedRate}%)
+              </p>
+            </Card>
+          </div>
+
+          {/* ── Visual Ratio Bar & Chart Grid ── */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
+            <Card padding="md">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                <h3 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0F172A', margin: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <TrendingUp size={15} style={{ color: '#059669' }} /> Cơ cấu phân bổ tiền cọc
+                </h3>
+                <span style={{ fontSize: '0.78rem', color: '#64748B' }}>
+                  Tổng quỹ: <strong style={{ color: '#0F172A' }}>{depositStats.totalAmount.toLocaleString()}đ</strong>
+                </span>
+              </div>
+
+              {/* Progress bar */}
+              <div style={{ height: 14, borderRadius: 7, overflow: 'hidden', display: 'flex', background: '#F1F5F9', marginBottom: '1rem' }}>
+                <div style={{ width: `${depositStats.completedRate}%`, background: '#10B981', transition: 'width 0.4s' }}
+                     title={`Kết chuyển sân: ${depositStats.completedAmount.toLocaleString()}đ (${depositStats.completedRate}%)`} />
+                <div style={{ width: `${depositStats.refundedRate}%`, background: '#3B82F6', transition: 'width 0.4s' }}
+                     title={`Đã hoàn trả: ${depositStats.refundedAmount.toLocaleString()}đ (${depositStats.refundedRate}%)`} />
+                <div style={{ width: `${depositStats.forfeitedRate}%`, background: '#F59E0B', transition: 'width 0.4s' }}
+                     title={`Đã giữ lại phạt: ${depositStats.forfeitedAmount.toLocaleString()}đ (${depositStats.forfeitedRate}%)`} />
+                {depositStats.pendingRate > 0 && (
+                  <div style={{ width: `${depositStats.pendingRate}%`, background: '#EF4444', transition: 'width 0.4s' }}
+                       title={`Chờ xử lý: ${depositStats.pendingDecisionAmount.toLocaleString()}đ (${depositStats.pendingRate}%)`} />
+                )}
+              </div>
+
+              {/* Legend rows */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: '0.8rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px dashed #F1F5F9' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#10B981' }} />
+                    <span style={{ color: '#475569' }}>Cọc kết chuyển doanh thu sân (đơn đã chơi):</span>
+                  </span>
+                  <strong style={{ color: '#059669' }}>{depositStats.completedAmount.toLocaleString()}đ ({depositStats.completedRate}%)</strong>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px dashed #F1F5F9' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#3B82F6' }} />
+                    <span style={{ color: '#475569' }}>Cọc đã hoàn trả lại cho khách (đơn hủy):</span>
+                  </span>
+                  <strong style={{ color: '#2563EB' }}>{depositStats.refundedAmount.toLocaleString()}đ ({depositStats.refundedRate}%)</strong>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 0' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#F59E0B' }} />
+                    <span style={{ color: '#475569' }}>Cọc thu phạt giữ lại quỹ (đơn hủy trễ/mất cọc):</span>
+                  </span>
+                  <strong style={{ color: '#D97706' }}>{depositStats.forfeitedAmount.toLocaleString()}đ ({depositStats.forfeitedRate}%)</strong>
+                </div>
+              </div>
+            </Card>
+
+            {/* Biểu đồ Recharts */}
+            <Card padding="md">
+              <h3 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0F172A', margin: '0 0 0.5rem', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <BarChart2 size={15} style={{ color: '#6366F1' }} /> So sánh số tiền cọc theo nhóm
+              </h3>
+              <div style={{ width: '100%', height: 160 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={depositCategoryData} margin={{ top: 15, right: 10, left: -10, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
+                    <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#64748B' }} />
+                    <YAxis tick={{ fontSize: 10, fill: '#64748B' }} tickFormatter={v => `${v/1000}k`} />
+                    <ChartTooltip formatter={v => [`${v.toLocaleString()}đ`, 'Số tiền']} />
+                    <Bar dataKey="amount" radius={[4, 4, 0, 0]}>
+                      {depositCategoryData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </Card>
+          </div>
+
+          {/* ── Filter bar cho Sổ quỹ cọc ── */}
+          <Card padding="md" style={{ marginBottom: '1.25rem' }}>
+            <div style={{ display: 'flex', gap: '0.875rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#475569',
+                            fontSize: '0.82rem', fontWeight: 600, paddingBottom: 2, flexShrink: 0 }}>
+                <Filter size={14} /> Lọc quỹ cọc
+              </div>
+              <div style={{ flex: '1 1 200px', minWidth: 180 }}>
+                <Input
+                  label="Tìm kiếm"
+                  placeholder="Mã đơn, tên khách, sân..."
+                  value={depositSearch}
+                  onChange={e => { setDepositSearch(e.target.value); setDepositPage(1); }}
+                />
+              </div>
+              <div style={{ flex: '1 1 180px', minWidth: 160 }}>
+                <Select
+                  label="Trạng thái cọc"
+                  value={depositFilterStatus}
+                  placeholder="Tất cả trạng thái"
+                  options={[
+                    { value: 'completed', label: 'Kết chuyển tiền sân' },
+                    { value: 'refunded', label: 'Đã hoàn trả khách' },
+                    { value: 'forfeited', label: 'Đã giữ lại (Phạt)' },
+                    { value: 'pending_decision', label: 'Chờ xử lý (Đơn hủy)' },
+                  ]}
+                  onChange={e => { setDepositFilterStatus(e.target.value); setDepositPage(1); }}
+                />
+              </div>
+              {(depositSearch || depositFilterStatus) && (
+                <div style={{ paddingBottom: 1 }}>
+                  <Button variant="ghost" size="sm" icon={<X size={13} />}
+                    onClick={() => { setDepositSearch(''); setDepositFilterStatus(''); setDepositPage(1); }}>
+                    Xóa lọc
+                  </Button>
+                </div>
+              )}
+            </div>
+          </Card>
+
+          {/* ── Bảng Sổ quỹ cọc ── */}
+          <Card padding="none">
+            <div style={{ padding: '0.875rem 1.25rem', borderBottom: '1px solid #E2E8F0',
+                          display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontWeight: 600, color: '#0F172A', fontSize: '0.9rem' }}>
+                Danh sách chi tiết các khoản tiền cọc
+              </span>
+              <span style={{ fontSize: '0.8rem', color: '#64748B' }}>
+                Hiển thị <strong style={{ color: '#0F172A' }}>{filteredDepositLedger.length}</strong> / {depositLedger.length} đơn có cọc
+              </span>
+            </div>
+            <Table columns={depositColumns} data={paginatedDepositLedger} emptyText="Không tìm thấy khoản tiền cọc nào" />
+            {filteredDepositLedger.length > depositPageSize && (
+              <div style={{ padding: '0.875rem 1.25rem', borderTop: '1px solid #E2E8F0' }}>
+                <Pagination
+                  currentPage={depositPage}
+                  totalItems={filteredDepositLedger.length}
+                  pageSize={depositPageSize}
+                  onPageChange={setDepositPage}
+                  onPageSizeChange={s => { setDepositPageSize(s); setDepositPage(1); }}
                 />
               </div>
             )}

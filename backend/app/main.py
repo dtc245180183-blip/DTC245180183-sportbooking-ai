@@ -1,10 +1,17 @@
+import logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+)
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.database import Base, engine
+from app.database import Base, engine, init_db_migrations
 import app.models # Register all models
 from app.routers import auth, court_types, courts, time_slots, customers, maintenance, payments, bookings, ai, statistics
 # Create tables in SQLite
 Base.metadata.create_all(bind=engine)
+init_db_migrations()
 
 app = FastAPI(title="Sport Court Booking API")
 

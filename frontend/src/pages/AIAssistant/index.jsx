@@ -733,9 +733,9 @@ export default function AIAssistant() {
                 type="button"
                 className={`prompt-chip ${msgType === 'confirmation' ? 'active' : ''}`}
                 onClick={() => setMsgType('confirmation')}
-                title="Chuyển mục đích sang tin nhắn xác nhận cọc"
+                title="Chuyển mục đích sang tin nhắn xác nhận đặt sân"
               >
-                ⚡ Soạn tin xác nhận đặt sân &amp; tiền cọc
+                ⚡ Soạn tin xác nhận đặt sân
               </button>
             </div>
 
@@ -783,7 +783,7 @@ export default function AIAssistant() {
                       borderRadius: 12, color: '#0F172A', padding: '9px 14px', fontSize: '0.875rem'
                     }}
                   >
-                    <option value="confirmation">Xác nhận đặt sân (gửi ngay sau khi cọc)</option>
+                    <option value="confirmation">Xác nhận đặt sân (gửi ngay sau khi xác nhận đặt sân)</option>
                     <option value="reminder">Nhắc lịch thi đấu (gửi trước giờ thi đấu)</option>
                   </select>
                 </div>

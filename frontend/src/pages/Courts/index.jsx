@@ -85,7 +85,10 @@ function CourtCard({ court, typeName, isAdmin, onEdit, onDelete }) {
           src={imgSrc}
           alt={typeName}
           style={{ width: '100%', height: '100%', objectFit: 'contain', padding: '10px' }}
-          onError={e => { e.target.src = '/images/sports/default.svg'; }}
+          onError={e => {
+            e.currentTarget.onerror = null;
+            e.currentTarget.src = getSportImage(typeName, null);
+          }}
         />
       </div>
 
@@ -118,8 +121,15 @@ function typeColumns(courtTypes, isAdmin, onEdit, onDelete) {
       key: 'name', label: 'Tên loại sân',
       render: (v, row) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <img src={getSportImage(v, row.image_url)} alt={v}
-            style={{ width: 36, height: 36, objectFit: 'cover', borderRadius: 6, flexShrink: 0 }} />
+          <img
+            src={getSportImage(v, row.image_url)}
+            alt={v}
+            style={{ width: 36, height: 36, objectFit: 'cover', borderRadius: 6, flexShrink: 0 }}
+            onError={e => {
+              e.currentTarget.onerror = null;
+              e.currentTarget.src = getSportImage(v, null);
+            }}
+          />
           <strong style={{ color: '#0F172A' }}>{v}</strong>
         </div>
       ),
@@ -394,7 +404,10 @@ export default function Courts() {
                 src={getSportImage(getTypeName(parseInt(courtForm.court_type_id)), courtForm.image_url || null)}
                 alt="preview"
                 style={{ width: '100%', height: 120, objectFit: 'cover', borderRadius: 8, border: '1px solid rgba(100,140,220,0.15)' }}
-                onError={e => { e.target.src = '/images/sports/default.svg'; }}
+                onError={e => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = getSportImage(getTypeName(parseInt(courtForm.court_type_id)), null);
+                }}
               />
             </div>
           )}

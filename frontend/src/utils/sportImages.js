@@ -9,7 +9,7 @@ const SPORT_KEYWORDS = {
   tennis:      ['tennis'],
   volleyball:  ['bóng chuyền', 'volleyball'],
   basketball:  ['bóng rổ', 'basketball'],
-  pickleball:  ['pickleball'],
+  pickleball:  ['pickleball', 'pickerball', 'pickkerball', 'pickle', 'picker'],
 };
 
 /**
@@ -18,15 +18,21 @@ const SPORT_KEYWORDS = {
  * @returns {string} URL ảnh để dùng trong <img src="">
  */
 export function getSportImage(typeName = '', imageUrl = null) {
-  if (imageUrl) return imageUrl;
-
-  const lower = typeName.toLowerCase();
-  for (const [sport, keywords] of Object.entries(SPORT_KEYWORDS)) {
-    if (keywords.some(kw => lower.includes(kw))) {
-      return `/images/sports/${sport}.svg`;
+  if (imageUrl && typeof imageUrl === 'string') {
+    const cleanUrl = imageUrl.trim().toLowerCase();
+    // Bỏ qua nếu là link trang web HTML thay vì file hình ảnh trực tiếp
+    if (!cleanUrl.endsWith('.html') && !cleanUrl.endsWith('.htm')) {
+      return imageUrl;
     }
   }
-  return '/images/sports/default.svg';
+
+  const lower = (typeName || '').toLowerCase();
+  for (const [sport, keywords] of Object.entries(SPORT_KEYWORDS)) {
+    if (keywords.some(kw => lower.includes(kw))) {
+      return `/images/sports/${sport}.svg?v=2`;
+    }
+  }
+  return '/images/sports/default.svg?v=2';
 }
 
 /**

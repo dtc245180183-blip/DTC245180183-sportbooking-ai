@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { 
   Calendar, 
   Sparkles, 
@@ -12,7 +13,8 @@ import {
   LayoutGrid,
   Trophy,
   Activity,
-  CircleDot
+  CircleDot,
+  Layers
 } from 'lucide-react';
 import { courtsAPI, courtTypesAPI, timeSlotsAPI, maintenanceAPI, bookingsAPI } from '../../api';
 import QuickBookModal from './QuickBookModal';
@@ -23,14 +25,37 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../components/ui/Toast';
 import { ConfirmModal, CustomerAvatar } from '../../components/ui';
 import { getSportImage, getSportAccent } from '../../utils/sportImages';
+import { getSlotMatchStatus, todayVN } from '../../utils/datetime';
 import './Schedule.css';
 
 export default function Schedule() {
   const { user } = useAuth();
   const { showToast } = useToast();
   const isAdmin = user?.role === 'admin';
+  const [searchParams] = useSearchParams();
 
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const p = new URLSearchParams(window.location.search).get('date');
+    return (p && /^\d{4}-\d{2}-\d{2}$/.test(p)) ? p : todayVN();
+  });
+
+  const [currentTime, setCurrentTime] = useState(() => new Date());
+
+  // Tự động làm mới mỗi 30s để cập nhật chuyển trạng thái "Đang sử dụng" và "Đã xong" theo thời gian thực
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 30000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const dateParam = searchParams.get('date');
+    if (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
+      setSelectedDate(dateParam);
+    }
+  }, [searchParams]);
+
   const [courts, setCourts] = useState([]);
   const [courtTypes, setCourtTypes] = useState([]);
   const [timeSlots, setTimeSlots] = useState([]);
@@ -38,6 +63,7 @@ export default function Schedule() {
   const [dayBookings, setDayBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedSport, setSelectedSport] = useState('all');
+
 
   // Modals state
   const [selectedSlot, setSelectedSlot] = useState(null);
@@ -82,19 +108,61 @@ export default function Schedule() {
     return courtTypes.find(t => t.id === courtTypeId)?.name || '';
   }, [courtTypes]);
 
-  // Bộ lọc Sport Pills
+  const getSportIcon = (typeName = '') => {
+    const lower = (typeName || '').toLowerCase();
+    if (lower.includes('bóng đá') || lower.includes('football') || lower.includes('soccer')) return CircleDot;
+    if (lower.includes('cầu lông') || lower.includes('badminton')) return Activity;
+    if (lower.includes('pickleball') || lower.includes('pickerball')) return Trophy;
+    if (lower.includes('bóng chuyền') || lower.includes('volleyball')) return Flame;
+    if (lower.includes('bóng rổ') || lower.includes('basketball')) return CircleDot;
+    if (lower.includes('tennis')) return Trophy;
+    return Layers;
+  };
+
+  // Danh sách Sport Pills động: tự động phân loại theo tất cả loại sân có trong hệ thống
+  const sportPills = useMemo(() => {
+    const pills = [
+      { id: 'all', label: 'Tất cả sân', icon: LayoutGrid, count: courts.length }
+    ];
+
+    courtTypes.forEach(ct => {
+      const count = courts.filter(c => c.court_type_id === ct.id).length;
+      if (count > 0) {
+        // Rút gọn nhãn hiển thị: bỏ tiền tố "Sân " nếu có để pill ngắn gọn đẹp mắt
+        const cleanLabel = ct.name.replace(/^Sân\s+/i, '');
+        pills.push({
+          id: String(ct.id),
+          label: cleanLabel || ct.name,
+          icon: getSportIcon(ct.name),
+          count: count
+        });
+      }
+    });
+
+    // Gom các sân không thuộc loại sân nào vào mục "Sân khác" (nếu có)
+    const knownTypeIds = new Set(courtTypes.map(ct => ct.id));
+    const otherCount = courts.filter(c => !knownTypeIds.has(c.court_type_id)).length;
+    if (otherCount > 0) {
+      pills.push({
+        id: 'other',
+        label: 'Sân khác',
+        icon: Layers,
+        count: otherCount
+      });
+    }
+
+    return pills;
+  }, [courts, courtTypes]);
+
+  // Bộ lọc danh sách Sân hiển thị theo Sport Pill được chọn
   const filteredCourts = useMemo(() => {
     if (!selectedSport || selectedSport === 'all') return courts;
-    return courts.filter(c => {
-      const type = (getCourtTypeName(c.court_type_id) || '').toLowerCase();
-      const name = (c.name || '').toLowerCase();
-      const combined = `${type} ${name}`;
-      if (selectedSport === 'football') return combined.includes('bóng đá') || combined.includes('football');
-      if (selectedSport === 'badminton') return combined.includes('cầu lông') || combined.includes('badminton');
-      if (selectedSport === 'pickleball') return combined.includes('pickleball');
-      return true;
-    });
-  }, [courts, selectedSport, getCourtTypeName]);
+    if (selectedSport === 'other') {
+      const knownTypeIds = new Set(courtTypes.map(ct => ct.id));
+      return courts.filter(c => !knownTypeIds.has(c.court_type_id));
+    }
+    return courts.filter(c => String(c.court_type_id) === String(selectedSport));
+  }, [courts, courtTypes, selectedSport]);
 
   const isCourtInMaintenance = (court) => {
     if (!court) return false;
@@ -155,17 +223,26 @@ export default function Schedule() {
   };
 
   const handleToday = () => {
+    setSelectedDate(todayVN());
+  };
+
+  const isToday = () => {
+    return selectedDate === todayVN(currentTime);
+  };
+
+  const isSlotPast = (slotDate, startTimeStr) => {
+    if (!slotDate || !startTimeStr) return false;
     const now = new Date();
     const y = now.getFullYear();
     const m = String(now.getMonth() + 1).padStart(2, '0');
     const d = String(now.getDate()).padStart(2, '0');
-    setSelectedDate(`${y}-${m}-${d}`);
-  };
-
-  const isToday = () => {
-    const now = new Date();
-    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-    return selectedDate === todayStr;
+    const todayStr = `${y}-${m}-${d}`;
+    if (slotDate < todayStr) return true;
+    if (slotDate > todayStr) return false;
+    const [startH, startM] = String(startTimeStr).slice(0, 5).split(':').map(Number);
+    const slotMinutes = startH * 60 + startM;
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    return slotMinutes <= currentMinutes;
   };
 
   const handleSlotClick = async (court, slot, hour) => {
@@ -195,6 +272,14 @@ export default function Schedule() {
     }
     
     if (slot.status === 'available') {
+      const isPast = isSlotPast(slot.date, slot.start_time);
+      if (isPast) {
+        showToast({
+          type: 'warning',
+          message: 'Khung giờ này đã trôi qua so với thời gian thực, không thể đặt sân.'
+        });
+        return;
+      }
       if (isAdmin) {
         // Admin: mở modal hỏi xác nhận khóa hay đặt sân
         setToggleSlotModal({ open: true, slot, isLocking: true });
@@ -231,6 +316,10 @@ export default function Schedule() {
   const handleSelectSuggestedSlot = (slotId) => {
     const slot = timeSlots.find(s => s.id === slotId);
     if (slot) {
+      if (isSlotPast(slot.date, slot.start_time)) {
+        showToast({ type: 'warning', message: 'Khung giờ gợi ý đã trôi qua so với thời gian thực, không thể đặt sân.' });
+        return;
+      }
       const court = courts.find(c => c.id === slot.court_id);
       setSelectedDate(slot.date);
       setSelectedCourt(court);
@@ -250,6 +339,7 @@ export default function Schedule() {
           <p className="page-subtitle">Xem tổng quan, quản lý khung giờ và đặt sân nhanh theo thời gian thực</p>
         </div>
       </div>
+
 
       {/* 1. Header Toolbar */}
       <div className="schedule-toolbar">
@@ -324,14 +414,9 @@ export default function Schedule() {
         </div>
       </div>
 
-      {/* Sport Pills Filter */}
+      {/* Sport Pills Filter — Tự động theo tất cả loại sân có trong hệ thống */}
       <div className="schedule-sport-pills">
-        {[
-          { id: 'all', label: 'Tất cả sân', icon: LayoutGrid, count: courts.length },
-          { id: 'pickleball', label: 'Pickleball', icon: Trophy, count: courts.filter(c => (getCourtTypeName(c.court_type_id) + c.name).toLowerCase().includes('pickleball')).length },
-          { id: 'badminton', label: 'Cầu lông', icon: Activity, count: courts.filter(c => (getCourtTypeName(c.court_type_id) + c.name).toLowerCase().includes('cầu lông') || (getCourtTypeName(c.court_type_id) + c.name).toLowerCase().includes('badminton')).length },
-          { id: 'football', label: 'Bóng đá', icon: CircleDot, count: courts.filter(c => (getCourtTypeName(c.court_type_id) + c.name).toLowerCase().includes('bóng đá') || (getCourtTypeName(c.court_type_id) + c.name).toLowerCase().includes('football')).length },
-        ].filter(p => p.id === 'all' || p.count > 0).map(pill => {
+        {sportPills.map(pill => {
           const Icon = pill.icon;
           const isActive = selectedSport === pill.id;
           return (
@@ -357,7 +442,15 @@ export default function Schedule() {
         </div>
         <div className="legend-item">
           <span className="legend-dot booked"></span>
-          <span>Đã đặt (Click xem chi tiết)</span>
+          <span>Đã đặt</span>
+        </div>
+        <div className="legend-item">
+          <span className="legend-dot in-use"></span>
+          <span style={{ fontWeight: 600, color: '#1D4ED8' }}>Đang sử dụng (Đến giờ đá)</span>
+        </div>
+        <div className="legend-item">
+          <span className="legend-dot completed"></span>
+          <span>Đã xong (Hết giờ)</span>
         </div>
         <div className="legend-item">
           <span className="legend-dot blocked"></span>
@@ -414,12 +507,8 @@ export default function Schedule() {
                             src={imgSrc}
                             alt={typeName || court.name}
                             onError={(e) => {
-                              const lower = (court.name || '').toLowerCase();
-                              if (lower.includes('pickleball')) e.currentTarget.src = '/images/sports/pickleball.svg';
-                              else if (lower.includes('cầu lông') || lower.includes('badminton')) e.currentTarget.src = '/images/sports/badminton.svg';
-                              else if (lower.includes('tennis')) e.currentTarget.src = '/images/sports/tennis.svg';
-                              else if (lower.includes('bóng đá') || lower.includes('football')) e.currentTarget.src = '/images/sports/football.svg';
-                              else e.currentTarget.src = '/images/sports/default.svg';
+                              e.currentTarget.onerror = null;
+                              e.currentTarget.src = getSportImage(typeName || court.name, null);
                             }}
                             className="court-sport-img"
                           />
@@ -473,10 +562,16 @@ export default function Schedule() {
                       const underMaintenance = isCourtInMaintenance(court);
                       const isBooked = slot && slot.status === 'booked';
                       const booking = isBooked ? getBookingForSlot(slot.id) : null;
+                      const isPast = slot ? isSlotPast(slot.date, slot.start_time) : false;
+                      const liveStatus = isBooked 
+                        ? getSlotMatchStatus(slot?.date, slot?.start_time, slot?.end_time, hour, currentTime) 
+                        : null;
                       
                       let cellClass = slot ? slot.status : 'missing';
                       if (underMaintenance && !isBooked) {
                         cellClass = 'maintenance';
+                      } else if (slot && slot.status === 'available' && isPast) {
+                        cellClass = 'available past';
                       }
                       
                       return (
@@ -487,16 +582,32 @@ export default function Schedule() {
                         >
                           {isBooked ? (
                             <div 
-                              className="slot-booked-card"
+                              className={`slot-booked-card status-${liveStatus || 'upcoming'}`}
                               title={
                                 booking 
-                                  ? `Đơn #${booking.id} - ${booking.customer?.full_name || 'Khách đặt'} (${booking.customer?.phone || 'Chưa có SĐT'})\nKhung giờ: ${hour.toString().padStart(2, '0')}:00 - ${(hour + 1).toString().padStart(2, '0')}:00\nTổng tiền: ${new Intl.NumberFormat('vi-VN').format(booking.total_amount)}đ${booking.deposit_amount > 0 ? ` (Đã cọc: ${new Intl.NumberFormat('vi-VN').format(booking.deposit_amount)}đ)` : ''}\nClick để xem chi tiết / đổi lịch / hủy lịch`
+                                  ? `Đơn #${booking.id} - ${booking.customer?.full_name || 'Khách đặt'} (${booking.customer?.phone || 'Chưa có SĐT'})\nTrạng thái: ${liveStatus === 'in_use' ? '🔴 Đang sử dụng (Trận đấu đang diễn ra)' : liveStatus === 'completed' ? '✓ Đã xong (Khung giờ thi đấu đã kết thúc)' : 'Đã đặt (Chưa đến giờ đá)'}\nKhung giờ: ${hour.toString().padStart(2, '0')}:00 - ${(hour + 1).toString().padStart(2, '0')}:00\nTổng tiền: ${new Intl.NumberFormat('vi-VN').format(booking.total_amount)}đ${booking.deposit_amount > 0 ? ` (Đã cọc: ${new Intl.NumberFormat('vi-VN').format(booking.deposit_amount)}đ)` : ''}\nClick để xem chi tiết / đổi lịch / hủy lịch`
                                   : `Đơn đặt sân #${slot.id}\nClick để xem chi tiết`
                               }
                             >
                               <div className="slot-booked-header">
                                 <span className="slot-booked-code">#{booking?.id || slot.id}</span>
-                                <span className="slot-booked-status-dot"></span>
+                                {liveStatus === 'in_use' && (
+                                  <span className="slot-live-badge in-use" title="Sân đang trong giờ thi đấu">
+                                    <span className="live-dot-pulse"></span>
+                                    Đang sử dụng
+                                  </span>
+                                )}
+                                {liveStatus === 'completed' && (
+                                  <span className="slot-live-badge completed" title="Khung giờ thi đấu đã kết thúc">
+                                    <span className="completed-check-icon">✓</span>
+                                    Đã xong
+                                  </span>
+                                )}
+                                {liveStatus === 'upcoming' && (
+                                  <span className="slot-live-badge upcoming" title="Đã đặt sân (Chưa đến giờ đá)">
+                                    Đã đặt
+                                  </span>
+                                )}
                               </div>
                               <div className="slot-booked-customer">
                                 <CustomerAvatar name={booking?.customer?.full_name || 'Khách'} size={20} />
@@ -520,21 +631,27 @@ export default function Schedule() {
                               <span>Bảo trì</span>
                             </div>
                           ) : slot && slot.status === 'available' ? (
-                            <>
-                              <div className="slot-available-idle">
-                                <span className="slot-available-badge">Trống</span>
-                                <span className="slot-available-price">
-                                  {new Intl.NumberFormat('vi-VN').format(court.price_per_hour)}đ
-                                </span>
+                            isPast ? (
+                              <div className="slot-past-card" title={`Khung giờ ${hour.toString().padStart(2, '0')}:00 - ${(hour + 1).toString().padStart(2, '0')}:00 đã trôi qua so với thời gian thực`}>
+                                <span className="slot-past-badge">Đã qua giờ</span>
                               </div>
-                              <div 
-                                className="slot-available-hover"
-                                title={`Khung giờ trống: ${hour.toString().padStart(2, '0')}:00 - ${(hour + 1).toString().padStart(2, '0')}:00\nClick để đặt sân nhanh`}
-                              >
-                                <Plus size={14} />
-                                <span>Đặt sân</span>
-                              </div>
-                            </>
+                            ) : (
+                              <>
+                                <div className="slot-available-idle">
+                                  <span className="slot-available-badge">Trống</span>
+                                  <span className="slot-available-price">
+                                    {new Intl.NumberFormat('vi-VN').format(court.price_per_hour)}đ
+                                  </span>
+                                </div>
+                                <div 
+                                  className="slot-available-hover"
+                                  title={`Khung giờ trống: ${hour.toString().padStart(2, '0')}:00 - ${(hour + 1).toString().padStart(2, '0')}:00\nClick để đặt sân nhanh`}
+                                >
+                                  <Plus size={14} />
+                                  <span>Đặt sân</span>
+                                </div>
+                              </>
+                            )
                           ) : slot && slot.status === 'blocked' ? (
                             <div 
                               className="slot-blocked-card"

@@ -10,7 +10,7 @@ from app.dependencies import get_current_user, require_admin
 router = APIRouter(prefix="/time-slots", tags=["time_slots"])
 
 @router.get("/", response_model=List[TimeSlotResponse])
-def get_time_slots(court_id: Optional[int] = None, filter_date: Optional[date] = None, status: Optional[str] = None, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+def get_time_slots(court_id: Optional[int] = None, filter_date: Optional[date] = None, status: Optional[str] = None, skip: int = 0, limit: int = 500, db: Session = Depends(get_db)):
     query = db.query(TimeSlot)
     if court_id:
         query = query.filter(TimeSlot.court_id == court_id)

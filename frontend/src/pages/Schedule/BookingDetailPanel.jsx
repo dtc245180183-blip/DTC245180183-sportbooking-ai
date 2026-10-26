@@ -4,6 +4,7 @@ import { bookingsAPI, aiAPI } from '../../api';
 import RescheduleModal from './RescheduleModal';
 import { useToast } from '../../components/ui/Toast';
 import { ConfirmModal } from '../../components/ui';
+import { getSlotMatchStatus } from '../../utils/datetime';
 import './Schedule.css';
 
 export default function BookingDetailPanel({ isOpen, onClose, slot, court, courts, onStatusChange }) {
@@ -93,6 +94,10 @@ export default function BookingDetailPanel({ isOpen, onClose, slot, court, court
 
   if (!isOpen || !slot || !court) return null;
 
+  const liveStatus = (slot && slot.status === 'booked') 
+    ? getSlotMatchStatus(slot.date, slot.start_time, slot.end_time) 
+    : null;
+
   return (
     <>
       <div className="modal-overlay" onClick={onClose}>
@@ -117,8 +122,25 @@ export default function BookingDetailPanel({ isOpen, onClose, slot, court, court
                       <Clock size={14} style={{ marginLeft: '0.5rem' }} /> {String(slot.start_time).substring(0,5)} - {String(slot.end_time).substring(0,5)}
                     </div>
                   </div>
-                  <div className={`status-badge ${booking.status}`}>
-                    {booking.status === 'confirmed' ? 'Đã xác nhận' : booking.status}
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.35rem' }}>
+                    <div className={`status-badge ${booking.status}`}>
+                      {booking.status === 'confirmed' ? 'Đã xác nhận' : booking.status === 'completed' ? 'Hoàn thành' : booking.status === 'cancelled' ? 'Đã hủy' : 'Chờ xử lý'}
+                    </div>
+                    {liveStatus === 'in_use' && (
+                      <span className="slot-live-badge in-use" style={{ fontSize: '0.72rem', padding: '2px 8px' }}>
+                        <span className="live-dot-pulse"></span> Đang sử dụng
+                      </span>
+                    )}
+                    {liveStatus === 'completed' && (
+                      <span className="slot-live-badge completed" style={{ fontSize: '0.72rem', padding: '2px 8px' }}>
+                        ✓ Đã xong (Hết giờ)
+                      </span>
+                    )}
+                    {liveStatus === 'upcoming' && (
+                      <span className="slot-live-badge upcoming" style={{ fontSize: '0.72rem', padding: '2px 8px' }}>
+                        Đã đặt (Chưa đến giờ)
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -217,7 +239,12 @@ export default function BookingDetailPanel({ isOpen, onClose, slot, court, court
           </div>
           
           <div className="modal-footer">
-            {booking && booking.status !== 'cancelled' && booking.status !== 'completed' && (
+            {liveStatus === 'completed' && (
+              <span style={{ fontSize: '0.8rem', color: '#64748B', background: '#F1F5F9', border: '1px solid #E2E8F0', padding: '4px 10px', borderRadius: '6px' }}>
+                Khung giờ đã kết thúc
+              </span>
+            )}
+            {booking && booking.status !== 'cancelled' && booking.status !== 'completed' && liveStatus !== 'completed' && (
               <>
                 <button type="button" className="btn-outline" onClick={() => setIsRescheduleOpen(true)}>
                   <ArrowLeftRight size={16} style={{marginRight: 4}}/> Đổi lịch

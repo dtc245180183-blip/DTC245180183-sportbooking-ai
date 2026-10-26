@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { usersAPI, authAPI } from '../../api';
 import { Shield, Plus, UserCog, UserMinus, Users as UsersIcon } from 'lucide-react';
 import { useToast } from '../../components/ui/Toast';
-import { Button, Card, Badge, Modal, Input, Select, Table, ConfirmModal } from '../../components/ui';
+import { Button, Card, Badge, Modal, Input, Table, ConfirmModal } from '../../components/ui';
 import './Users.css';
 
 export default function Users() {
@@ -35,8 +35,8 @@ export default function Users() {
         await usersAPI.update(editId, updateData);
         showToast({ type: 'success', message: 'Cập nhật thông tin nhân viên thành công' });
       } else {
-        await authAPI.register(formData);
-        showToast({ type: 'success', message: 'Tạo tài khoản mới thành công' });
+        await authAPI.register({ ...formData, role: 'staff' });
+        showToast({ type: 'success', message: 'Thêm tài khoản nhân viên thành công' });
       }
       setShowForm(false);
       setFormData({ username: '', full_name: '', role: 'staff', password: '' });
@@ -143,7 +143,7 @@ export default function Users() {
       <Modal
         open={showForm}
         onClose={() => setShowForm(false)}
-        title={editId ? 'Sửa thông tin nhân viên' : 'Tạo tài khoản mới'}
+        title={editId ? 'Sửa thông tin nhân viên' : 'Thêm tài khoản nhân viên'}
         footer={
           <>
             <Button variant="ghost" onClick={() => setShowForm(false)}>Hủy</Button>
@@ -156,8 +156,12 @@ export default function Users() {
             onChange={e => setFormData(p => ({ ...p, username: e.target.value }))} />
           <Input label="Họ và tên" required value={formData.full_name}
             onChange={e => setFormData(p => ({ ...p, full_name: e.target.value }))} />
-          <Select label="Vai trò" value={formData.role} onChange={e => setFormData(p => ({ ...p, role: e.target.value }))}
-            options={[{ value: 'staff', label: 'Nhân viên (Staff)' }, { value: 'admin', label: 'Quản lý (Admin)' }]} />
+          <Input
+            label="Vai trò"
+            value={formData.role === 'admin' ? 'Quản lý (Admin)' : 'Nhân viên (Staff)'}
+            disabled
+            hint={!editId ? 'Mặc định là tài khoản Nhân viên vận hành' : undefined}
+          />
           <Input
             label={editId ? 'Mật khẩu (trống = không đổi)' : 'Mật khẩu'}
             type="password"

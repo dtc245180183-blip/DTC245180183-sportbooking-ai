@@ -101,7 +101,7 @@ DTC245180183-sportbooking-ai/
 │   └── ci.yml
 ├── backend/                    # Mã nguồn Máy chủ Dịch vụ (FastAPI & SQLite)
 │   ├── app/                    # Ứng dụng nghiệp vụ (routers, models, schemas, services, ai)
-│   ├── tests/                  # Bộ kiểm thử tự động toàn diện Pytest
+│   ├── tests/                  # Bộ kiểm thử tự động toàn diện Pytest (test_bookings, test_payments, test_ai)
 │   ├── sport_court.db          # Cơ sở dữ liệu mẫu đang chạy (12 đơn, thực thu 1,750,000đ)
 │   ├── requirements.txt        # Danh mục thư viện Python phụ thuộc
 │   ├── pytest.ini              # Cấu hình kiểm thử Pytest
@@ -126,6 +126,10 @@ DTC245180183-sportbooking-ai/
 │       └── UI-UX-DESIGN.md     # Tài liệu phân tích và thiết kế giao diện Glassmorphism
 ├── frontend/                   # Mã nguồn Giao diện Người dùng (React 18 + Vite 5 SPA)
 │   ├── src/                    # Components, Pages, Contexts, APIs
+│   │   ├── components/         # Topbar, NotificationPopover (Phân quyền chuông báo), UI components
+│   │   ├── pages/              # Dashboard, Schedule, Bookings, Maintenance, Payments, Courts, TimeSlots, Users, Reports, AIAssistant
+│   │   ├── api/                # Axios client cấu hình BaseURL, Interceptors tự động gắn Bearer Token
+│   │   └── contexts/           # AuthContext (quản lý phiên đăng nhập JWT và phân quyền Admin/Staff)
 │   ├── nginx.conf              # Cấu hình Reverse Proxy Nginx điều hướng API & SPA routing
 │   ├── package.json            # Danh mục phụ thuộc Frontend
 │   └── Dockerfile              # Dockerfile Multi-stage (Node Build -> Nginx Alpine)
@@ -134,6 +138,121 @@ DTC245180183-sportbooking-ai/
 ├── README.md                   # Tài liệu báo cáo chính thức của đồ án (file hiện tại)
 └── docker-compose.yml          # Kịch bản triển khai trọn gói Docker đa dịch vụ
 ```
+
+---
+
+### 3.1. Luồng Dữ Liệu & Quy Trình Vận Hành Web Hiện Tại (End-to-End Web Data Flows)
+
+Hệ thống SportBooking Pro vận hành dựa trên sự kết hợp chặt chẽ giữa 5 tầng kiến trúc: **Giao diện Người dùng (React 18 SPA) ➜ Cổng Điều hướng (Nginx Proxy) ➜ Máy chủ Nghiệp vụ (FastAPI Async) ➜ Cơ sở Dữ liệu (SQLite & SQLAlchemy ORM) ➜ Trợ lý Thông minh (Google Gemini AI)**.
+
+Dưới đây là các luồng dữ liệu cốt lõi phản ánh chính xác 100% trải nghiệm thực tế trên hệ thống web hiện tại:
+
+```mermaid
+flowchart TD
+    subgraph UI_Layer [Tầng Giao Diện Web - React 18 SPA]
+        ScheduleUI[Lưới Lịch Tương Tác /schedule]
+        BookingUI[Quản Lý Đơn Đặt /bookings]
+        PaymentUI[Thu Ngân & Quyết Toán /payments]
+        MaintUI[Lập Lịch Bảo Trì /maintenance]
+        NotifBell[Chuông Thông Báo Thời Gian Thực]
+        AIUI[Trợ Lý AI Đa Năng /ai-assistant]
+    end
+
+    subgraph Gateway [Cổng Điều Hướng - Nginx Reverse Proxy]
+        Proxy[Nginx Alpine Port 5173]
+    end
+
+    subgraph Service_Layer [Tầng Dịch Vụ Nghiệp Vụ - FastAPI Server]
+        AuthRouter[Auth Service /auth]
+        BookingRouter[Booking Engine /bookings]
+        SlotRouter[TimeSlots Service /time-slots]
+        PaymentRouter[Payment Service /payments]
+        MaintRouter[Maintenance Service /maintenance]
+        AIRouter[AI Service /ai]
+    end
+
+    subgraph Data_AI [Tầng CSDL & Trí Tuệ Nhân Tạo]
+        DB[(SQLite Engine with Row-Locking)]
+        Gemini[Google Gemini 3.6 Flash API]
+    end
+
+    UI_Layer -->|RESTful Request with JWT| Proxy
+    Proxy -->|Reverse Proxy /api/v1| Service_Layer
+    BookingRouter -->|with_for_update Row Lock| DB
+    PaymentRouter -->|Hạch toán Cọc & Quyết toán| DB
+    SlotRouter -->|Tự động sinh ca| DB
+    MaintRouter -->|Khóa slot tự động| DB
+    AIRouter -->|Prompt + Context| Gemini
+    AIRouter -->|Ghi log kiểm toán| DB
+```
+
+#### A. Luồng Xác thực & Điều hướng Phân quyền (Authentication & RBAC Routing)
+1. **Đăng nhập:** Người dùng nhập tài khoản (`admin` hoặc `staff`) tại `/login`. Giao diện gửi `POST /auth/login`.
+2. **Cấp phát JWT:** FastAPI kiểm tra mật khẩu đã băm (Bcrypt), trả về `access_token` chứa `user_id` và `role`.
+3. **Phân nhánh giao diện:**
+   - `AuthContext` lưu Token và trạng thái người dùng vào `localStorage`.
+   - **Tài khoản Admin:** Hiển thị toàn bộ Menu: *Tổng quan (Dashboard)*, *Lịch đặt sân*, *Đơn đặt sân*, *Quản lý sân*, *Khung giờ*, *Bảo trì sân*, *Thanh toán*, *Người dùng*, *Báo cáo*, *Trợ lý AI*.
+   - **Tài khoản Staff:** Tự động ẩn các trang quản trị nhạy cảm (ẩn *Người dùng*, *Báo cáo doanh thu*), chỉ hiển thị các chức năng phục vụ ca trực tại quầy.
+
+#### B. Luồng Vận hành Lưới Lịch & Đặt Sân Chống Trùng (Interactive Schedule & Conflict-Free Booking)
+1. **Sinh ca tự động (Auto Generate Slots):** Lễ tân/Quản trị viên chọn ngày và bấm nút **"Tạo ca tự động"** ➜ Gửi `POST /time-slots/generate-day` ➜ Hệ thống kiểm tra cấu hình thời gian mở/đóng cửa và tự động tạo ma trận các khung giờ (ví dụ: 06:00 - 22:00) cho toàn bộ các sân bóng, cầu lông, pickleball nếu chưa có.
+2. **Hiển thị trực quan theo thời gian thực:** Giao diện tải danh sách sân và khung giờ theo ngày được chọn. Các ô lịch được hiển thị bằng màu sắc trực quan: *Xanh lá (Trống - Available)*, *Đỏ/Tím (Đã đặt - Booked)*, *Vàng/Cam (Bảo trì - Maintenance)*.
+3. **Đặt sân tại quầy:** Nhân viên click trực tiếp vào ô sân trống hoặc bấm nút **"Đặt sân"** ➜ Nhập số điện thoại khách (tự động nhận diện khách quen hoặc lưu khách mới), chọn hình thức cọc (mặc định 30% - 50%) ➜ Gửi `POST /bookings`.
+4. **Cơ chế Khóa giao dịch Chống Trùng (Concurrency Control):**
+   - FastAPI mở giao dịch CSDL với cơ chế khóa dòng `with_for_update` trên bản ghi `time_slots`.
+   - Nếu slot đã bị người khác đặt hoặc đang trong lịch bảo dưỡng ➜ Lập tức trả lỗi `HTTP 400 ("Khung giờ đã kín lịch hoặc bảo trì")` và kích hoạt gợi ý giờ thay thế từ AI.
+   - Nếu slot hợp lệ ➜ Cập nhật slot sang `booked`, thêm đơn vào bảng `bookings` với trạng thái `confirmed`, ghi nhận tiền cọc vào bảng `payments` (`status = 'paid'`).
+
+#### C. Luồng Thu Ngân, Quyết Toán Hóa Đơn & Hoàn Tiền Cọc (Cashier Settlement & Refund)
+1. **Đối soát số tiền còn thiếu:** Sau khi trận đấu diễn ra hoặc kết thúc, hệ thống tự động tính toán:  
+   $$\text{Tiền còn thiếu} = \text{Tổng tiền đơn} - (\text{Tiền cọc} + \text{Các khoản đã thu})$$
+2. **Quyết toán hoàn tất (Complete Booking):**
+   - Lễ tân mở đơn đặt hoặc nhận thông báo thu tiền trên quả chuông ➜ Bấm **"Quyết toán"** (`POST /bookings/{id}/complete` hoặc qua màn hình `/payments`).
+   - Khách trả phần tiền còn lại qua tiền mặt hoặc chuyển khoản QR ➜ Ghi nhận giao dịch `paid`, đơn chuyển trạng thái sang `completed`.
+3. **Quy trình Hủy lịch & Đối soát Cọc:**
+   - **Hủy hợp lệ (trước 24h):** Đơn chuyển `cancelled`, hệ thống tự động ghi nhận phiếu hoàn tiền (`refunded`), giải phóng ô sân về `available` cho khách khác đặt.
+   - **Hủy vi phạm (sát giờ):** Đơn chuyển `cancelled` nhưng giữ lại tiền cọc (`retained deposit`), ghi nhận vào doanh thu bồi thường vi phạm hợp đồng của cơ sở.
+
+#### D. Luồng Vòng Đời Bảo Trì Sân & Thao Tác 1-Click (Court Maintenance Lifecycle)
+Hệ thống chuẩn hóa quy trình bảo trì sân theo 3 giai đoạn chặt chẽ:
+1. **Lên Kế hoạch (`planned`):** Admin lập lịch bảo trì cho sân (`POST /maintenance`) chọn ngày bắt đầu và kết thúc ➜ Hệ thống tự động khóa toàn bộ các khung giờ của sân trong khoảng thời gian này để lễ tân không thể nhận đặt lịch.
+2. **Đang Thi Công (`in_progress`):** Khi đến ngày bắt đầu (hoặc Admin bấm nút thao tác nhanh 1-Click **"Chuyển sang Đang bảo trì"** ngay trên quả chuông thông báo) ➜ Sân chính thức đóng cửa phục vụ.
+3. **Nghiệm Thu & Mở Lại Sân (`done`):** Sau khi bảo dưỡng xong, Admin bấm **"Nghiệm thu & Mở sân"** (trực tiếp từ thông báo hoặc trang Bảo trì) ➜ Hệ thống mở khóa sân, trạng thái chuyển về sẵn sàng đón khách.
+
+#### E. Luồng Động Cơ Thông Báo Đa Tác Nhân Thời Gian Thực (Role-Based Real-Time Notification Engine)
+Cứ mỗi 60 giây, hệ thống tự động quét dữ liệu và kích hoạt thông báo phân quyền độc lập qua quả chuông:
+
+```mermaid
+graph TD
+    Timer((Tự động quét mỗi 60s)) --> RoleCheck{Kiểm tra Role Đang Đăng Nhập}
+
+    subgraph Luong_Admin [Phân Hệ Thông Báo: Quản Trị Viên (Admin)]
+        RoleCheck -->|Role: Admin| MaintScan[Quét Lịch Bảo Trì Cơ Sở Vật Chất]
+        MaintScan --> N1[⚡ Sân bắt đầu bảo trì hôm nay ➜ Nút 1-Click 'Chuyển sang Đang bảo trì']
+        MaintScan --> N2[🚨 Cảnh báo quá hạn bắt đầu bảo trì ➜ Nút 1-Click 'Bắt đầu bảo trì ngay']
+        MaintScan --> N3[🕒 Lịch bảo trì đến hạn hoàn thành hôm nay ➜ Nút 1-Click 'Nghiệm thu & Mở sân']
+        MaintScan --> N4[🚨 Cảnh báo quá hạn mở sân ➜ Nút 1-Click 'Nghiệm thu & Mở sân ngay']
+        MaintScan --> N5[📅 Nhắc nhở lịch bảo trì ngày mai]
+        AdminNote[Hoàn toàn không nhận thông báo Thu tiền lẻ & Đơn hàng ngày]
+    end
+
+    subgraph Luong_Staff [Phân Hệ Thông Báo: Lễ Tân / Thu Ngân (Staff)]
+        RoleCheck -->|Role: Staff| BookingScan[Quét Đơn Đặt Sân & Thu Tiền]
+        BookingScan --> S1[💳 Trận kết thúc nhưng chưa trả đủ tiền ➜ Bấm chuyển sang trang Thu tiền]
+        BookingScan --> S2[🔥 Báo động đỏ: Trận đấu sắp diễn ra trong 60 phút ➜ Đón khách & Bật đèn sân]
+        BookingScan --> S3[📋 Danh sách các trận đấu diễn ra hôm nay]
+        BookingScan --> S4[⏳ Đơn đặt sân mới đang chờ duyệt]
+        BookingScan --> S5[🔍 Xem chi tiết kế hoạch bảo trì ngày ➜ Tránh xếp lịch trùng cho khách]
+    end
+```
+
+* **Điểm đột phá:** Thông báo trận đấu sử dụng **cơ chế 2 chặng thông minh**: Đầu ngày nhân viên xem lịch tổng quan (đã đọc), khi đồng hồ đếm ngược bước vào mốc **60 phút trước giờ thi đấu**, quả chuông sẽ **tự động phát sáng trở lại với biểu tượng ngọn lửa (`Flame`)**, đảm bảo không bao giờ bỏ quên lượt khách sắp đến.
+
+#### F. Luồng Trí Tuệ Nhân Tạo Google Gemini Hai Chiều (Two-Way Gemini AI Integration)
+1. **Gợi ý slot thay thế (`POST /ai/suggest-slot`):** Khi khung giờ khách yêu cầu bị kín hoặc đang bảo dưỡng, nhân viên bấm **"AI Gợi ý"** ➜ Gemini phân tích các sân cùng loại và các khung giờ trống liền kề để đề xuất 2-3 phương án tối ưu nhất.
+2. **Tự động sinh tin nhắn CSKH (`POST /ai/generate-notification`):** Tự động điền thông tin khách, mã đơn, số tiền cọc và sinh tin nhắn SMS/Zalo chuẩn mực chỉ trong 1 click.
+3. **Cố vấn kinh doanh cho Admin (`POST /ai/business-insights`):** Phân tích ma trận tỷ lệ lấp đầy, đề xuất khung giờ vàng và gợi ý chiến lược giảm giá giờ thấp điểm.
+4. **Cơ chế Fallback & Ghi vết:** Toàn bộ cuộc gọi AI đều có cơ chế dự phòng tự động bằng thuật toán Rule-based nếu mạng quá tải và lưu vết kiểm toán đầy đủ vào bảng `ai_logs` (`latency_ms`, `status`).
 
 ---
 

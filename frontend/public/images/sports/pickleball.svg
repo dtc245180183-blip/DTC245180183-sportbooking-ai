@@ -37,7 +37,7 @@
   <circle cx="135" cy="68" r="2" fill="#f8fafc" opacity="0.7"/>
   <circle cx="130" cy="76" r="2" fill="#f8fafc" opacity="0.7"/>
   <!-- Paddle (simplified) -->
-  <ellipse cx="290" cy="68" rx="20" ry="25" rx="20" ry="25" fill="#3b82f6" opacity="0.7" transform="rotate(-20,290,68)"/>
+  <ellipse cx="290" cy="68" rx="20" ry="25" fill="#3b82f6" opacity="0.7" transform="rotate(-20,290,68)"/>
   <ellipse cx="290" cy="68" rx="14" ry="19" fill="none" stroke="#e2e8f0" stroke-width="0.8" opacity="0.5" transform="rotate(-20,290,68)"/>
   <line x1="280" y1="88" x2="275" y2="100" stroke="#3b82f6" stroke-width="4" stroke-linecap="round"/>
   <!-- NVZ label -->

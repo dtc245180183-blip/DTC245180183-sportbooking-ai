@@ -16,34 +16,31 @@ router = APIRouter(prefix="/statistics", tags=["statistics"])
 
 @router.get("/overview", response_model=OverviewResponse)
 def get_overview(db: Session = Depends(get_db), current_user = Depends(get_current_user)):
-    # Tổng doanh thu = payments đã paid + tiền cọc tất cả booking − tổng tiền hoàn trả (refunded)
+    # Tổng doanh thu = payments đã paid (đã bao gồm các khoản cọc) − tổng tiền hoàn trả (refunded)
     payments_revenue = db.query(func.sum(Payment.amount)).filter(Payment.status == "paid").scalar() or 0.0
-    refunds_sum = db.query(func.sum(Payment.amount)).filter(Payment.status == "refunded").scalar() or 0.0
-    total_deposits_revenue = db.query(func.sum(Booking.deposit_amount)).filter(
-        Booking.deposit_amount > 0
-    ).scalar() or 0.0
-    total_revenue = max(0.0, payments_revenue + total_deposits_revenue - refunds_sum)
     
-    # Tổng cọc đang giữ = tổng cọc tất cả booking có deposit > 0 − cọc đã hoàn trả (refunded)
-    # Bao gồm cả booking đã hủy nhưng chưa hoàn cọc cho khách
-    all_deposits = db.query(func.sum(Booking.deposit_amount)).filter(
-        Booking.deposit_amount > 0
-    ).scalar() or 0.0
-    refunded_deposits = db.query(func.sum(Payment.amount)).filter(
-        Payment.status == "refunded"
-    ).scalar() or 0.0
-    total_deposit_query = max(0.0, all_deposits - refunded_deposits)
+    # Kiểm tra các đơn cũ nếu chưa có payment paid
+    all_bookings = db.query(Booking).filter(Booking.deposit_amount > 0).all()
+    unrecorded_deposits = 0.0
+    for b in all_bookings:
+        has_paid_p = db.query(Payment).filter(Payment.booking_id == b.id, Payment.status == "paid").first()
+        if not has_paid_p:
+            unrecorded_deposits += float(b.deposit_amount or 0.0)
 
-    # Phân tách cọc: có hiệu (pending/confirmed) vs giữ sau hủy
+    refunds_sum = db.query(func.sum(Payment.amount)).filter(Payment.status == "refunded").scalar() or 0.0
+    total_revenue = max(0.0, payments_revenue + unrecorded_deposits - refunds_sum)
+    
+    # Tổng cọc đang giữ = cọc đơn active + cọc đơn hủy chưa chốt phạt và chưa hoàn
     deposit_from_active = db.query(func.sum(Booking.deposit_amount)).filter(
         Booking.status.in_(["pending", "confirmed"]),
         Booking.deposit_amount > 0
     ).scalar() or 0.0
 
-    # Cọc giữ lại từ booking đã hủy nhưng chưa có giao dịch refund
+    # Cọc giữ lại từ booking đã hủy nhưng chưa chốt phạt và chưa refund
     cancelled_with_deposit = db.query(Booking).filter(
         Booking.status == "cancelled",
-        Booking.deposit_amount > 0
+        Booking.deposit_amount > 0,
+        Booking.deposit_forfeited != True
     ).all()
     deposit_from_cancelled = 0.0
     for b in cancelled_with_deposit:
@@ -53,8 +50,10 @@ def get_overview(db: Session = Depends(get_db), current_user = Depends(get_curre
         ).first()
         if not has_refund:
             amount = b.deposit_amount
-            deposit_from_cancelled += float(amount) if amount is not None else 0.0  # type: ignore
+            deposit_from_cancelled += float(amount) if amount is not None else 0.0 # type: ignore
     
+    total_deposit_query = deposit_from_active + deposit_from_cancelled
+
     # Doanh thu hôm nay = đã thu hôm nay − hoàn trả hôm nay
     today = date.today()
     all_payments = db.query(Payment).all()
@@ -136,6 +135,33 @@ def get_revenue_chart(
         end_date = to_date
         
     def calculate_revenue_series(s_date, e_date):
+        if s_date == e_date:
+            # Xem 1 ngày: thống kê chi tiết theo từng khung giờ trong ngày (06:00 đến 23:00)
+            hour_dict = {f"{h:02d}:00": 0.0 for h in range(6, 24)}
+            payments = db.query(Payment).all()
+            for p in payments:
+                if p.paid_at and p.paid_at.date() == s_date:
+                    h_str = f"{p.paid_at.hour:02d}:00"
+                    if h_str in hour_dict:
+                        if p.status == "paid":
+                            hour_dict[h_str] += float(p.amount or 0.0)
+                        elif p.status == "refunded":
+                            hour_dict[h_str] -= float(p.amount or 0.0)
+
+            bookings = db.query(Booking).filter(Booking.deposit_amount > 0).all()
+            for b in bookings:
+                if b.created_at and b.created_at.date() == s_date:
+                    h_str = f"{b.created_at.hour:02d}:00"
+                    if h_str in hour_dict:
+                        hour_dict[h_str] += float(b.deposit_amount or 0.0)
+
+            for k in hour_dict:
+                hour_dict[k] = max(0.0, hour_dict[k])
+
+            items = [RevenueChartItem(date=k, revenue=v) for k, v in hour_dict.items()]
+            items.sort(key=lambda x: x.date)
+            return items
+
         days = (e_date - s_date).days + 1
         rev_dict = {}
         for i in range(days):
@@ -186,11 +212,6 @@ def get_peak_hours(
     slots_query = db.query(TimeSlot)
     if not all_time and from_date and to_date:
         slots = slots_query.filter(TimeSlot.date >= from_date, TimeSlot.date <= to_date).all()
-        booked_in_range = sum(1 for s in slots if s.status == "booked")
-        if booked_in_range == 0:
-            total_booked = db.query(TimeSlot).filter(TimeSlot.status == "booked").count()
-            if total_booked > 0:
-                slots = slots_query.all()
     else:
         slots = slots_query.all()
     
@@ -259,7 +280,25 @@ def get_court_occupancy(
         occ = (booked_slots / total_slots * 100) if total_slots > 0 else 0.0
         
         court_bookings = booking_query.all()
-        revenue = sum(b.total_amount for b in court_bookings)
+        revenue = 0.0
+        for b in court_bookings:
+            paid_sum = db.query(func.sum(Payment.amount)).filter(
+                Payment.booking_id == b.id,
+                Payment.status == "paid"
+            ).scalar() or 0.0
+            
+            has_paid_p = db.query(Payment).filter(
+                Payment.booking_id == b.id,
+                Payment.status == "paid"
+            ).first()
+            unrec_dep = float(b.deposit_amount or 0.0) if not has_paid_p else 0.0
+            
+            ref_sum = db.query(func.sum(Payment.amount)).filter(
+                Payment.booking_id == b.id,
+                Payment.status == "refunded"
+            ).scalar() or 0.0
+            
+            revenue += max(0.0, float(paid_sum) + unrec_dep - float(ref_sum))
         
         result.append(CourtOccupancyItem(
             court_id=int(str(court.id)),

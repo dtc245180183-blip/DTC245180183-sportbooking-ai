@@ -13,3 +13,7 @@ class MaintenanceSchedule(Base):
     status = Column(String, nullable=False, default="planned") # planned, in_progress, done
 
     court = relationship("Court", back_populates="maintenance_schedules")
+
+    @property
+    def court_name(self):
+        return self.court.name if self.court else None

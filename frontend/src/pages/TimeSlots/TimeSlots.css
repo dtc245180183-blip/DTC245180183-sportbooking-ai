@@ -1,0 +1,696 @@
+/* =====================================================
+   ENTERPRISE TIME SLOTS & TIMELINE MANAGEMENT CSS
+   Modern Soft-UI & High-Density Operational Styling
+   ===================================================== */
+
+.timeslots-page {
+  padding: 0 0 3rem;
+  max-width: 1440px;
+  margin: 0 auto;
+}
+
+/* ── Top Header Card ───────────────────────────────── */
+.timeslots-header-card {
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 16px;
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.25rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.timeslots-title-area h1 {
+  font-size: 1.45rem;
+  font-weight: 800;
+  color: #0F172A;
+  margin: 0 0 4px;
+  letter-spacing: -0.02em;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.timeslots-title-area p {
+  font-size: 0.85rem;
+  color: #64748B;
+  margin: 0;
+}
+
+.timeslots-top-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+/* ── View Mode Switcher (Matrix vs Shift Grid) ─────── */
+.view-mode-pill-group {
+  display: inline-flex;
+  background: #F1F5F9;
+  padding: 4px;
+  border-radius: 12px;
+  gap: 4px;
+}
+
+.view-mode-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 9px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  color: #64748B;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.view-mode-btn:hover {
+  color: #0F172A;
+}
+
+.view-mode-btn.active {
+  background: #FFFFFF;
+  color: #059669;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+/* ── Smart Date Strip Navigator ───────────────────── */
+.date-navigator-card {
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 14px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.25rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.date-nav-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.85rem;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.date-nav-label {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #0F172A;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.date-nav-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.date-strip-scroll {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.date-pill-item {
+  flex: 1;
+  min-width: 95px;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  padding: 8px 10px;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.18s ease;
+  user-select: none;
+}
+
+.date-pill-item:hover {
+  background: #F1F5F9;
+  border-color: #CBD5E1;
+}
+
+.date-pill-item.active {
+  background: #ECFDF5;
+  border-color: #10B981;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.18);
+}
+
+.date-pill-dow {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #64748B;
+  text-transform: uppercase;
+}
+
+.date-pill-item.active .date-pill-dow {
+  color: #059669;
+}
+
+.date-pill-date {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #0F172A;
+  margin: 2px 0 0;
+}
+
+.date-pill-item.active .date-pill-date {
+  color: #059669;
+}
+
+.date-pill-badge {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #64748B;
+  margin-top: 2px;
+}
+
+.date-pill-item.active .date-pill-badge {
+  color: #047857;
+  font-weight: 700;
+}
+
+/* ── Live Capacity & Metrics KPIs ─────────────────── */
+.timeslots-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.85rem;
+  margin-bottom: 1.25rem;
+}
+
+.slot-stat-card {
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  position: relative;
+  overflow: hidden;
+  border-top-width: 3px;
+  transition: transform 0.15s ease;
+}
+
+.slot-stat-card:hover {
+  transform: translateY(-2px);
+}
+
+.slot-stat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.slot-stat-title {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: #64748B;
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.slot-stat-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.slot-stat-val {
+  font-size: 1.45rem;
+  font-weight: 800;
+  margin: 0;
+  line-height: 1.1;
+}
+
+.slot-stat-sub {
+  font-size: 0.72rem;
+  color: #64748B;
+  margin: 4px 0 0;
+}
+
+.slot-stat-progress {
+  width: 100%;
+  height: 4px;
+  background: #F1F5F9;
+  border-radius: 999px;
+  margin-top: 8px;
+  overflow: hidden;
+}
+
+.slot-stat-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+/* ── Filter Bar & Actions ──────────────────────────── */
+.filter-action-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.filter-chips-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.filter-chip {
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid #E2E8F0;
+  background: #FFFFFF;
+  color: #475569;
+  transition: all 0.15s ease;
+}
+
+.filter-chip:hover {
+  background: #F8FAFC;
+  border-color: #CBD5E1;
+}
+
+.filter-chip.active {
+  background: #0F172A;
+  color: #FFFFFF;
+  border-color: #0F172A;
+}
+
+.court-selector-strip {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  overflow-x: auto;
+  margin-bottom: 1.25rem;
+  padding-bottom: 4px;
+}
+
+.court-strip-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 16px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #334155;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.court-strip-btn:hover {
+  background: #F8FAFC;
+  border-color: #CBD5E1;
+}
+
+.court-strip-btn.active {
+  background: #ECFDF5;
+  color: #059669;
+  border-color: #10B981;
+  box-shadow: 0 1px 4px rgba(16, 185, 129, 0.15);
+}
+
+/* ── Shift Sections & Cards Grid ──────────────────── */
+.shift-section {
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 14px;
+  padding: 1.25rem;
+  margin-bottom: 1.25rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+.shift-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding-bottom: 0.65rem;
+  border-bottom: 1px solid #F1F5F9;
+}
+
+.shift-title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.shift-title {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #0F172A;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.shift-time-tag {
+  font-size: 0.74rem;
+  color: #64748B;
+  font-weight: 500;
+}
+
+.shift-badge-pulse {
+  background: #FEE2E2;
+  color: #DC2626;
+  border: 1px solid #FECACA;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.shift-slots-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(185px, 1fr));
+  gap: 0.85rem;
+}
+
+/* ── Enterprise Slot Card ─────────────────────────── */
+.enterprise-slot-card {
+  border-radius: 12px;
+  padding: 0.9rem;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 120px;
+  border: 1px solid transparent;
+}
+
+/* Status variants */
+.enterprise-slot-card.available {
+  background: #FFFFFF;
+  border-color: #86EFAC;
+  box-shadow: 0 1px 3px rgba(16, 185, 129, 0.08);
+}
+
+.enterprise-slot-card.available:hover {
+  border-color: #10B981;
+  box-shadow: 0 6px 16px rgba(16, 185, 129, 0.18);
+  transform: translateY(-2px);
+}
+
+.enterprise-slot-card.booked {
+  background: #FFF1F2;
+  border-color: #FDA4AF;
+  box-shadow: 0 1px 3px rgba(225, 29, 72, 0.06);
+}
+
+.enterprise-slot-card.booked:hover {
+  border-color: #E11D48;
+  box-shadow: 0 6px 16px rgba(225, 29, 72, 0.16);
+  transform: translateY(-2px);
+}
+
+.enterprise-slot-card.blocked {
+  background: #F8FAFC;
+  border-color: #CBD5E1;
+  background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(226, 232, 240, 0.5) 10px, rgba(226, 232, 240, 0.5) 20px);
+}
+
+.slot-time-range {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #0F172A;
+  margin: 0 0 4px;
+  letter-spacing: -0.01em;
+}
+
+.slot-card-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 6px;
+  text-transform: uppercase;
+}
+
+.enterprise-slot-card.available .slot-card-status-badge {
+  background: #DCFCE7;
+  color: #15803D;
+  border: 1px solid #BBF7D0;
+}
+
+.enterprise-slot-card.booked .slot-card-status-badge {
+  background: #FFE4E6;
+  color: #BE123C;
+  border: 1px solid #FECDD3;
+}
+
+.enterprise-slot-card.blocked .slot-card-status-badge {
+  background: #E2E8F0;
+  color: #475569;
+  border: 1px solid #CBD5E1;
+}
+
+.slot-card-customer-info {
+  margin: 8px 0;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid #FECDD3;
+  border-radius: 8px;
+  padding: 6px 8px;
+}
+
+.slot-cust-name {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #9F1239;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.slot-cust-sub {
+  font-size: 0.7rem;
+  color: #64748B;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.slot-card-price {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #059669;
+}
+
+.slot-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px dashed rgba(0, 0, 0, 0.08);
+}
+
+.slot-action-btn {
+  flex: 1;
+  padding: 4px 6px;
+  border-radius: 6px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  transition: all 0.15s ease;
+}
+
+.slot-action-btn.primary {
+  background: #10B981;
+  color: #FFFFFF;
+}
+
+.slot-action-btn.primary:hover {
+  background: #059669;
+}
+
+.slot-action-btn.secondary {
+  background: #F1F5F9;
+  color: #475569;
+  border: 1px solid #E2E8F0;
+}
+
+.slot-action-btn.secondary:hover {
+  background: #E2E8F0;
+  color: #0F172A;
+}
+
+.slot-action-btn.danger {
+  background: #FEE2E2;
+  color: #B91C1C;
+  border: 1px solid #FECACA;
+}
+
+.slot-action-btn.danger:hover {
+  background: #FECACA;
+}
+
+/* ── Multi-Court Timeline Matrix ───────────────────── */
+.matrix-container {
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 16px;
+  padding: 1.25rem;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03);
+  overflow-x: auto;
+}
+
+.matrix-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 6px;
+  min-width: 900px;
+}
+
+.matrix-header-cell {
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  padding: 10px 12px;
+  text-align: center;
+  font-weight: 700;
+  color: #0F172A;
+  font-size: 0.84rem;
+}
+
+.matrix-time-col {
+  width: 100px;
+  background: #0F172A;
+  color: #FFFFFF;
+  border-radius: 10px;
+  padding: 8px;
+  text-align: center;
+  font-weight: 800;
+  font-size: 0.84rem;
+  letter-spacing: 0.02em;
+}
+
+.matrix-slot-cell {
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 0.78rem;
+  transition: all 0.18s ease;
+  cursor: pointer;
+  vertical-align: middle;
+}
+
+.matrix-slot-cell.available {
+  background: #F0FDF4;
+  border: 1px solid #BBF7D0;
+  color: #15803D;
+}
+
+.matrix-slot-cell.available:hover {
+  background: #DCFCE7;
+  border-color: #86EFAC;
+  transform: scale(1.02);
+}
+
+.matrix-slot-cell.booked {
+  background: #FFF1F2;
+  border: 1px solid #FECDD3;
+  color: #BE123C;
+}
+
+.matrix-slot-cell.booked:hover {
+  background: #FFE4E6;
+  border-color: #FDA4AF;
+  transform: scale(1.02);
+}
+
+.matrix-slot-cell.blocked {
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  color: #64748B;
+  background-image: repeating-linear-gradient(45deg, transparent, transparent 6px, #F1F5F9 6px, #F1F5F9 12px);
+}
+
+.matrix-slot-cell.empty {
+  background: #F8FAFC;
+  border: 1px dashed #CBD5E1;
+  color: #94A3B8;
+  text-align: center;
+  cursor: default;
+}
+
+/* ── Bulk Actions Floating Bar ─────────────────────── */
+.bulk-floating-bar {
+  position: fixed;
+  bottom: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #0F172A;
+  color: #FFFFFF;
+  border-radius: 14px;
+  padding: 0.75rem 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25);
+  z-index: 100;
+  animation: slideUp 0.2s ease-out;
+}
+
+@keyframes slideUp {
+  from { transform: translate(-50%, 20px); opacity: 0; }
+  to { transform: translate(-50%, 0); opacity: 1; }
+}
+
+/* ── Responsive adjustments ────────────────────────── */
+@media (max-width: 1024px) {
+  .timeslots-stats-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .timeslots-stats-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .shift-slots-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}

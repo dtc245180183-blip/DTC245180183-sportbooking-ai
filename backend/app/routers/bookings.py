@@ -88,7 +88,42 @@ def confirm_booking(
     if booking.status == "confirmed":
         raise HTTPException(status_code=400, detail="Booking này đã được xác nhận trước đó")
 
+    # Kiểm tra thời gian thực: Không cho phép xác nhận đơn đặt sân đã quá giờ chơi
+    from datetime import datetime, timezone, timedelta
+    tz_vn = timezone(timedelta(hours=7))
+    now_vn = datetime.now(tz_vn).replace(tzinfo=None)
+    if booking.time_slot:
+        slot_end_dt = datetime.combine(booking.time_slot.date, booking.time_slot.end_time)
+        if slot_end_dt <= now_vn:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Khung giờ chơi của đơn đặt sân này đã kết thúc ({slot_end_dt.strftime('%H:%M %d/%m/%Y')} so với thời gian hiện tại {now_vn.strftime('%H:%M %d/%m/%Y')}), không thể xác nhận."
+            )
+
     setattr(booking, "status", "confirmed")
     db.commit()
     db.refresh(booking)
     return booking
+
+@router.put("/{booking_id}/forfeit-deposit", response_model=BookingDetailResponse)
+def forfeit_deposit(
+    booking_id: int,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    """Xác nhận chốt phạt cọc cho đơn đã hủy, đóng hồ sơ theo dõi hoàn cọc."""
+    booking = db.query(Booking).filter(Booking.id == booking_id).first()
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    if booking.status != "cancelled":
+        raise HTTPException(status_code=400, detail="Chỉ có thể chốt giữ cọc cho đơn đã hủy")
+    
+    setattr(booking, "deposit_forfeited", True)
+    note_str = " [Đã chốt giữ cọc vào doanh thu]"
+    if not booking.note or note_str not in booking.note:
+        booking.note = (booking.note or "") + note_str # type: ignore
+        
+    db.commit()
+    db.refresh(booking)
+    return booking
+

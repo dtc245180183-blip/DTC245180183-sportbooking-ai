@@ -5,6 +5,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../components/ui/Toast';
 import { Button, Card, Badge, Modal, Input, Select, Table, ConfirmModal, CustomerAvatar, CustomerPopover, Pagination } from '../../components/ui';
 import { useDebounce } from '../../utils/useDebounce';
+import { getSlotMatchStatus } from '../../utils/datetime';
 import AISuggestModal from './AISuggestModal';
 import BookingDetailModal from './BookingDetailModal';
 
@@ -43,15 +44,35 @@ export default function Bookings() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
+  // Date & Time validation helpers
+  const getLocalDateString = (d = new Date()) => {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const isSlotPast = (slotDate, startTimeStr) => {
+    if (!slotDate || !startTimeStr) return false;
+    const now = new Date();
+    const todayStr = getLocalDateString(now);
+    if (slotDate < todayStr) return true;
+    if (slotDate > todayStr) return false;
+    const [startH, startM] = startTimeStr.slice(0, 5).split(':').map(Number);
+    const slotMinutes = startH * 60 + startM;
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    return slotMinutes <= currentMinutes;
+  };
+
   // Create form
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [createForm, setCreateForm] = useState({ customer_id: '', court_id: '', time_slot_id: '', deposit_amount: '', note: '' });
+  const [createForm, setCreateForm] = useState({ customer_id: '', court_id: '', time_slot_id: '', deposit_amount: '', deposit_method: 'cash', note: '' });
   const [availableSlots, setAvailableSlots]   = useState([]);
-  const [createDate, setCreateDate]           = useState(new Date().toISOString().slice(0, 10));
+  const [createDate, setCreateDate]           = useState(getLocalDateString());
 
   // Reschedule
   const [rescheduleBooking, setRescheduleBooking] = useState(null);
-  const [rescheduleForm, setRescheduleForm] = useState({ court_id: '', date: new Date().toISOString().slice(0, 10), new_time_slot_id: '' });
+  const [rescheduleForm, setRescheduleForm] = useState({ court_id: '', date: getLocalDateString(), new_time_slot_id: '' });
   const [rescheduleSlots, setRescheduleSlots]     = useState([]);
 
   // Payment
@@ -103,7 +124,10 @@ export default function Bookings() {
   const fetchAvailableSlots = useCallback(() => {
     if (createForm.court_id && createDate) {
       timeSlotsAPI.getAll({ court_id: createForm.court_id, filter_date: createDate, status: 'available' })
-        .then(setAvailableSlots).catch(() => setAvailableSlots([]));
+        .then(slots => {
+          const validSlots = Array.isArray(slots) ? slots.filter(s => !isSlotPast(s.date, s.start_time)) : [];
+          setAvailableSlots(validSlots);
+        }).catch(() => setAvailableSlots([]));
     } else { setAvailableSlots([]); }
   }, [createForm.court_id, createDate]);
 
@@ -114,7 +138,10 @@ export default function Bookings() {
   const fetchRescheduleSlots = useCallback(() => {
     if (rescheduleForm.court_id && rescheduleForm.date) {
       timeSlotsAPI.getAll({ court_id: rescheduleForm.court_id, filter_date: rescheduleForm.date, status: 'available' })
-        .then(setRescheduleSlots).catch(() => setRescheduleSlots([]));
+        .then(slots => {
+          const validSlots = Array.isArray(slots) ? slots.filter(s => !isSlotPast(s.date, s.start_time)) : [];
+          setRescheduleSlots(validSlots);
+        }).catch(() => setRescheduleSlots([]));
     } else { setRescheduleSlots([]); }
   }, [rescheduleForm.court_id, rescheduleForm.date]);
 
@@ -141,11 +168,18 @@ export default function Bookings() {
       return;
     }
 
+    const selectedSlot = availableSlots.find(s => s.id === parseInt(createForm.time_slot_id));
+    if (selectedSlot && isSlotPast(selectedSlot.date, selectedSlot.start_time)) {
+      showToast({ type: 'warning', message: 'Khung giờ này đã trôi qua so với thời gian thực. Vui lòng chọn khung giờ khác.' });
+      return;
+    }
+
     try {
       await bookingsAPI.create({
         customer_id:    parseInt(createForm.customer_id),
         time_slot_id:   parseInt(createForm.time_slot_id),
         deposit_amount: dep,
+        deposit_method: createForm.deposit_method || 'cash',
         note:           createForm.note,
       });
       setShowCreateModal(false);
@@ -164,6 +198,12 @@ export default function Bookings() {
 
   const handleConfirmSubmit = async () => {
     if (!confirmBookingId) return;
+    const targetBooking = bookings.find(b => b.id === confirmBookingId);
+    if (targetBooking?.time_slot && isSlotPast(targetBooking.time_slot.date, targetBooking.time_slot.end_time || targetBooking.time_slot.start_time)) {
+      showToast({ type: 'warning', message: 'Khung giờ chơi của đơn đặt sân này đã kết thúc, không thể xác nhận.' });
+      setConfirmBookingId(null);
+      return;
+    }
     setConfirmLoading(true);
     try {
       await bookingsAPI.confirm(confirmBookingId);
@@ -179,10 +219,18 @@ export default function Bookings() {
 
   const handleOpenCancel = (b) => {
     setCancelModalBooking(b);
+    let hoursUntilStart = 999;
+    if (b.time_slot?.date && b.time_slot?.start_time) {
+      const slotDt = new Date(`${b.time_slot.date}T${b.time_slot.start_time}`);
+      hoursUntilStart = (slotDt - new Date()) / (1000 * 60 * 60);
+    }
+    const shouldSuggestRefund = hoursUntilStart > 12;
+
     setCancelForm({
-      refund_deposit: false,
+      refund_deposit: shouldSuggestRefund && ((b.deposit_amount || 0) > 0),
       refund_method: 'cash',
       reason: '',
+      hoursUntilStart,
     });
   };
 
@@ -190,6 +238,7 @@ export default function Bookings() {
     e.preventDefault();
     if (!cancelModalBooking) return;
     setCancellingId(cancelModalBooking.id);
+    const hasDeposit = (cancelModalBooking.deposit_amount || 0) > 0;
     try {
       await bookingsAPI.cancel(cancelModalBooking.id, {
         refund_deposit: cancelForm.refund_deposit,
@@ -199,8 +248,10 @@ export default function Bookings() {
       showToast({
         type: 'success',
         message: cancelForm.refund_deposit
-          ? `Đã hủy lịch đặt #${cancelModalBooking.id} và hoàn cọc ${(cancelModalBooking.deposit_amount || 0).toLocaleString()}đ!`
-          : `Đã hủy lịch đặt #${cancelModalBooking.id} (giữ lại tiền cọc)!`
+          ? `Đã hủy lịch đặt #${cancelModalBooking.id} và hoàn tiền ${(cancelModalBooking.deposit_amount || 0).toLocaleString()}đ!`
+          : (hasDeposit 
+              ? `Đã hủy lịch đặt #${cancelModalBooking.id} (giữ lại tiền cọc)!`
+              : `Đã hủy lịch đặt #${cancelModalBooking.id}! Khung giờ đã được giải phóng.`)
       });
       setCancelModalBooking(null);
       fetchAll();
@@ -208,6 +259,16 @@ export default function Bookings() {
       showToast({ type: 'error', message: err.response?.data?.detail || 'Hủy thất bại' });
     } finally {
       setCancellingId(null);
+    }
+  };
+
+  const handleForfeitDeposit = async (bookingId) => {
+    try {
+      await bookingsAPI.forfeitDeposit(bookingId);
+      showToast({ type: 'success', message: `Đã chốt giữ cọc đơn #${bookingId} vào doanh thu!` });
+      fetchAll();
+    } catch (err) {
+      showToast({ type: 'error', message: err.response?.data?.detail || 'Thao tác thất bại' });
     }
   };
 
@@ -255,6 +316,11 @@ export default function Bookings() {
 
   const handleReschedule = async (e) => {
     e.preventDefault();
+    const selectedNewSlot = rescheduleSlots.find(s => s.id === parseInt(rescheduleForm.new_time_slot_id));
+    if (selectedNewSlot && isSlotPast(selectedNewSlot.date, selectedNewSlot.start_time)) {
+      showToast({ type: 'warning', message: 'Không thể đổi sang khung giờ đã trôi qua so với thời gian thực.' });
+      return;
+    }
     try {
       const res = await bookingsAPI.reschedule(rescheduleBooking.id, { new_time_slot_id: parseInt(rescheduleForm.new_time_slot_id) });
       setRescheduleBooking(null);
@@ -504,8 +570,42 @@ export default function Bookings() {
         return <span style={{ color: '#94A3B8', fontSize: '0.78rem' }}>Chưa cọc</span>;
       }
     },
-    { key: 'status', label: 'Trạng thái', width: '150px', padding: '12px 12px 12px 24px',
-      render: v => <Badge status={STATUS_MAP[v]?.status || 'pending'} label={STATUS_MAP[v]?.label || v} /> },
+    { key: 'status', label: 'Trạng thái', width: '160px', padding: '12px 12px 12px 24px',
+      render: (v, b) => {
+        const slot = b.time_slot;
+        const matchStatus = slot ? getSlotMatchStatus(slot.date, slot.start_time, slot.end_time) : null;
+
+        if (b.status === 'cancelled') {
+          return <Badge status="cancelled" label="Đã hủy" />;
+        }
+
+        if (matchStatus === 'in_use') {
+          return (
+            <div style={{ display: 'inline-flex', flexDirection: 'column', gap: 3, alignItems: 'flex-start' }}>
+              <span className="slot-live-badge in-use" style={{ fontSize: '0.7rem', padding: '2px 7px' }}>
+                <span className="live-dot-pulse"></span> Đang sử dụng
+              </span>
+              <span style={{ fontSize: '0.68rem', color: '#16A34A', fontWeight: 600 }}>
+                {STATUS_MAP[v]?.label || v}
+              </span>
+            </div>
+          );
+        }
+
+        if (matchStatus === 'completed' || b.status === 'completed') {
+          return (
+            <div style={{ display: 'inline-flex', flexDirection: 'column', gap: 3, alignItems: 'flex-start' }}>
+              <Badge status="completed" label="Đã xong" />
+              {b.status === 'confirmed' && (
+                <span style={{ fontSize: '0.68rem', color: '#64748B' }}>Đã xác nhận</span>
+              )}
+            </div>
+          );
+        }
+
+        return <Badge status={STATUS_MAP[v]?.status || 'pending'} label={STATUS_MAP[v]?.label || v} />;
+      }
+    },
     { key: 'actions', label: 'THAO TÁC', align: 'right',
       render: (_, b) => {
         const slot = b.time_slot;
@@ -523,18 +623,32 @@ export default function Bookings() {
               Chi tiết
             </Button>
 
-            {/* Nút Hoàn cọc cho đơn đã hủy mà còn cọc giữ lại */}
-            {b.status === 'cancelled' && depAmount > 0 && !hasRefund && (
-              <Button variant="ghost" size="sm" icon={<RefreshCw size={12} />}
-                style={{ color: '#0284C7', borderColor: '#BAE6FD', background: '#F0F9FF' }}
-                onClick={() => handleOpenRefund(b)}
-                title="Tùy lý do, bạn có quyền hoàn lại cọc cho khách">
-                Hoàn cọc
-              </Button>
+            {/* Nút Hoàn cọc & Chốt cọc cho đơn đã hủy mà còn cọc giữ lại */}
+            {b.status === 'cancelled' && depAmount > 0 && !hasRefund && !b.deposit_forfeited && (
+              <>
+                <Button variant="ghost" size="sm" icon={<RefreshCw size={12} />}
+                  style={{ color: '#0284C7', borderColor: '#BAE6FD', background: '#F0F9FF' }}
+                  onClick={() => handleOpenRefund(b)}
+                  title="Tùy lý do, bạn có quyền hoàn lại cọc cho khách">
+                  Hoàn cọc
+                </Button>
+                <Button variant="ghost" size="sm"
+                  style={{ color: '#92400E', borderColor: '#FDE68A', background: '#FFFBEB' }}
+                  onClick={() => handleForfeitDeposit(b.id)}
+                  title="Chốt giữ cọc (đóng hồ sơ phạt cọc)">
+                  Chốt cọc
+                </Button>
+              </>
             )}
 
-            {/* Nút Xác nhận — chỉ hiện khi booking đang pending */}
-            {b.status === 'pending' && (
+            {b.status === 'cancelled' && b.deposit_forfeited && (
+              <span style={{ fontSize: '0.72rem', color: '#92400E', background: '#FEF3C7', border: '1px solid #FDE68A', padding: '2px 8px', borderRadius: 4, fontWeight: 500 }}>
+                Đã chốt giữ cọc
+              </span>
+            )}
+
+            {/* Nút Xác nhận — chỉ hiện khi booking đang pending và chưa qua giờ chơi */}
+            {b.status === 'pending' && !isSlotPast(slot?.date, slot?.end_time || slot?.start_time) && (
               <Button variant="ghost" size="sm" icon={<CheckCircle size={12} />}
                 style={{ color: '#15803D', borderColor: '#BBF7D0', background: '#F0FDF4', fontWeight: 600 }}
                 onClick={() => setConfirmBookingId(b.id)}>
@@ -542,21 +656,30 @@ export default function Bookings() {
               </Button>
             )}
 
-            {/* Các đơn confirmed hoặc pending: đổi lịch và hủy lịch */}
+            {/* Nếu đơn pending đã quá giờ chơi thì hiển thị nhãn Quá giờ chơi */}
+            {b.status === 'pending' && isSlotPast(slot?.date, slot?.end_time || slot?.start_time) && (
+              <span style={{ fontSize: '0.72rem', color: '#94A3B8', background: '#F8FAFC', border: '1px solid #E2E8F0', padding: '2px 8px', borderRadius: 4, fontWeight: 500 }}>
+                Quá giờ chơi
+              </span>
+            )}
+
+            {/* Các đơn confirmed hoặc pending: đổi lịch (chỉ khi chưa quá giờ) và hủy lịch */}
             {(b.status === 'confirmed' || b.status === 'pending') && (
               <>
-                <Button variant="ghost" size="sm" icon={<ArrowLeftRight size={12} />}
-                  onClick={() => {
-                    setRescheduleBooking(b);
-                    setRescheduleForm({
-                      court_id: b.court_id,
-                      date: slot?.date || new Date().toISOString().slice(0,10),
-                      new_time_slot_id: ''
-                    });
-                  }}
-                  title="Đổi sang sân hoặc khung giờ khác">
-                  Đổi lịch
-                </Button>
+                {!isSlotPast(slot?.date, slot?.end_time || slot?.start_time) && (
+                  <Button variant="ghost" size="sm" icon={<ArrowLeftRight size={12} />}
+                    onClick={() => {
+                      setRescheduleBooking(b);
+                      setRescheduleForm({
+                        court_id: b.court_id,
+                        date: slot?.date || getLocalDateString(),
+                        new_time_slot_id: ''
+                      });
+                    }}
+                    title="Đổi sang sân hoặc khung giờ khác">
+                    Đổi lịch
+                  </Button>
+                )}
                 <Button variant="danger" size="sm" icon={<X size={12} />}
                   onClick={() => handleOpenCancel(b)}
                   title="Hủy đơn đặt sân này">
@@ -674,7 +797,7 @@ export default function Bookings() {
                 placeholder="-- Chọn sân --"
                 options={courts.filter(c => c.status === 'active').map(c => ({ value: c.id, label: c.name }))}
                 onChange={e => setCreateForm(p => ({ ...p, court_id: e.target.value, time_slot_id: '' }))} />
-              <Input label="Ngày đặt" type="date" value={createDate}
+              <Input label="Ngày đặt" type="date" value={createDate} min={getLocalDateString()}
                 onChange={e => setCreateDate(e.target.value)} />
 
               {/* Hộp thông tin giá sân niêm yết */}
@@ -750,6 +873,17 @@ export default function Bookings() {
                 <div style={{ fontSize: '0.74rem', color: '#64748B', marginTop: 4 }}>
                   * Quy định: Tiền cọc từ 0đ đến tối đa bằng giá sân {selectedCourtPrice > 0 ? `(${selectedCourtPrice.toLocaleString()}đ)` : ''}.
                 </div>
+
+                {parseFloat(createForm.deposit_amount) > 0 && (
+                  <div style={{ marginTop: 10 }}>
+                    <Select
+                      label="Phương thức nộp cọc"
+                      value={createForm.deposit_method || 'cash'}
+                      options={PAYMENT_METHODS}
+                      onChange={e => setCreateForm(p => ({ ...p, deposit_method: e.target.value }))}
+                    />
+                  </div>
+                )}
               </div>
 
               <div style={{ gridColumn: '1/-1' }}>
@@ -795,7 +929,7 @@ export default function Bookings() {
                 placeholder="-- Giữ sân cũ --"
                 options={courts.filter(c => c.status === 'active').map(c => ({ value: c.id, label: c.name }))}
                 onChange={e => setRescheduleForm(p => ({ ...p, court_id: e.target.value, new_time_slot_id: '' }))} />
-              <Input label="Ngày mới" type="date" value={rescheduleForm.date}
+              <Input label="Ngày mới" type="date" value={rescheduleForm.date} min={getLocalDateString()}
                 onChange={e => setRescheduleForm(p => ({ ...p, date: e.target.value, new_time_slot_id: '' }))} />
 
               {/* Thông tin giá sân mới & chênh lệch */}
@@ -902,9 +1036,26 @@ export default function Bookings() {
 
             {(cancelModalBooking.deposit_amount || 0) > 0 ? (
               <div style={{ background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 10, padding: '1rem' }}>
-                <p style={{ margin: '0 0 0.5rem', fontWeight: 600, color: '#B45309', fontSize: '0.9rem' }}>
-                  Lưu ý: Đơn này có tiền cọc {cancelModalBooking.deposit_amount.toLocaleString()}đ
-                </p>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap', gap: 6 }}>
+                  <span style={{ fontWeight: 600, color: '#B45309', fontSize: '0.9rem' }}>
+                    Lưu ý: Đơn này có tiền cọc {cancelModalBooking.deposit_amount.toLocaleString()}đ
+                  </span>
+                  {cancelForm.hoursUntilStart !== undefined && cancelForm.hoursUntilStart < 900 && (
+                    <span style={{
+                      fontSize: '0.75rem',
+                      padding: '2px 8px',
+                      borderRadius: 4,
+                      fontWeight: 600,
+                      background: cancelForm.hoursUntilStart > 12 ? '#DCFCE7' : '#FEE2E2',
+                      color: cancelForm.hoursUntilStart > 12 ? '#15803D' : '#B91C1C',
+                      border: `1px solid ${cancelForm.hoursUntilStart > 12 ? '#BBF7D0' : '#FECACA'}`
+                    }}>
+                      {cancelForm.hoursUntilStart > 12
+                        ? `Khách báo trước > 12h: Gợi ý hoàn cọc 100%`
+                        : `Khách báo sát giờ (< 12h): Khuyến nghị giữ cọc`}
+                    </span>
+                  )}
+                </div>
                 <p style={{ margin: '0 0 0.75rem', fontSize: '0.8rem', color: '#64748B' }}>
                   Do bạn nắm quyền giao dịch, bạn có thể quyết định giữ cọc hoặc hoàn lại cọc tùy theo lý do:
                 </p>
@@ -940,7 +1091,11 @@ export default function Bookings() {
                   </div>
                 )}
               </div>
-            ) : null}
+            ) : (
+              <div style={{ background: '#F1F5F9', border: '1px solid #E2E8F0', borderRadius: 10, padding: '0.75rem 1rem', fontSize: '0.85rem', color: '#475569' }}>
+                ℹ️ <strong>Đơn không có cọc:</strong> Khung giờ sẽ được giải phóng ngay lập tức để người khác có thể đặt. Không phát sinh giao dịch hoàn tiền.
+              </div>
+            )}
 
             <Input
               label="Lý do hủy / Ghi chú"

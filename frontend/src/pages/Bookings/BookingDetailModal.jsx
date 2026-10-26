@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { X, Copy, CheckCircle, Sparkles, RefreshCw } from 'lucide-react';
+import { X, Copy, CheckCircle, Sparkles, RefreshCw, Lock } from 'lucide-react';
 import { aiAPI } from '../../api';
 import AICard from '../../components/AICard';
 import { Button, Badge } from '../../components/ui';
+import { getSlotMatchStatus } from '../../utils/datetime';
 
 const STATUS_MAP = {
   pending:   { label: 'Chờ xử lý',  color: '#f59e0b', status: 'pending'   },
@@ -31,6 +32,7 @@ export default function BookingDetailModal({ booking, onClose, onRefund }) {
   const cust   = booking.customer;
   const court  = booking.court;
   const status = STATUS_MAP[booking.status] || STATUS_MAP.pending;
+  const matchStatus = st ? getSlotMatchStatus(st.date, st.start_time, st.end_time) : null;
 
   const isConfirmDisabled  = ['cancelled', 'completed'].includes(booking.status);
   const isReminderDisabled = booking.status !== 'confirmed';
@@ -92,7 +94,21 @@ export default function BookingDetailModal({ booking, onClose, onRefund }) {
             <InfoRow label="Sân"           value={court?.name || `Sân#${booking.court_id}`} />
             <InfoRow label="Ngày chơi"     value={st?.date || '—'} />
             <InfoRow label="Giờ"           value={st ? `${String(st.start_time).slice(0,5)} – ${String(st.end_time).slice(0,5)}` : '—'} />
-            <InfoRow label="Trạng thái"    value={<Badge status={status.status} label={status.label} />} />
+            <InfoRow label="Trạng thái"    value={
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                <Badge status={status.status} label={status.label} />
+                {booking.status !== 'cancelled' && matchStatus === 'in_use' && (
+                  <span className="slot-live-badge in-use" style={{ fontSize: '0.72rem', padding: '2px 8px' }}>
+                    <span className="live-dot-pulse"></span> Đang sử dụng
+                  </span>
+                )}
+                {booking.status !== 'cancelled' && (matchStatus === 'completed' || booking.status === 'completed') && (
+                  <span className="slot-live-badge completed" style={{ fontSize: '0.72rem', padding: '2px 8px' }}>
+                    ✓ Đã xong
+                  </span>
+                )}
+              </div>
+            } />
             <InfoRow label="Tiền cọc"      value={
               (() => {
                 const hasRefund = booking.payments?.some(p => p.status === 'refunded');
@@ -130,13 +146,31 @@ export default function BookingDetailModal({ booking, onClose, onRefund }) {
                           Cọc giữ lại
                         </span>
                       </div>
-                      {onRefund && (
+                      {onRefund && !booking.deposit_forfeited && (
                         <div style={{ marginTop: 6 }}>
                           <Button variant="secondary" size="sm" icon={<RefreshCw size={12} />}
                             style={{ color: '#0284C7', borderColor: '#BAE6FD', background: '#F0F9FF', fontSize: '0.75rem', padding: '2px 8px' }}
                             onClick={() => onRefund(booking)}>
                             Hoàn cọc cho khách
                           </Button>
+                        </div>
+                      )}
+                      {booking.deposit_forfeited && (
+                        <div style={{ marginTop: 6 }}>
+                          <span style={{
+                            fontSize: '0.72rem',
+                            color: '#92400E',
+                            background: '#FEF3C7',
+                            border: '1px solid #FDE68A',
+                            padding: '2px 8px',
+                            borderRadius: 4,
+                            fontWeight: 600,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4
+                          }}>
+                            <Lock size={11} /> Đã chốt giữ cọc
+                          </span>
                         </div>
                       )}
                     </div>

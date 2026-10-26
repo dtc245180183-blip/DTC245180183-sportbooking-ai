@@ -15,7 +15,7 @@ def check_and_update_booking_status(db: Session, booking_id: int):
     
     Luồng trạng thái:
       pending   → confirmed : NHÂN VIÊN XÁC NHẬN THỦ CÔNG (không dùng hàm này)
-      confirmed → completed : TỰ ĐỘNG khi thu đủ tiền  ← hàm này xử lý
+      confirmed → completed : TỰ ĐỘNG khi thu đủ tiền VÀ đã qua giờ chơi kết thúc
       any       → cancelled : NHÂN VIÊN HỦY THỦ CÔNG   (không dùng hàm này)
     """
     booking = db.query(Booking).filter(Booking.id == booking_id).first()
@@ -29,8 +29,10 @@ def check_and_update_booking_status(db: Session, booking_id: int):
         Payment.status == "paid"
     ).scalar() or 0.0
 
-    # Cộng thêm tiền cọc đặt ban đầu (deposit_amount lưu trực tiếp trên booking)
-    total_paid = paid_sum + (booking.deposit_amount or 0)
+    if paid_sum == 0.0 and (booking.deposit_amount or 0) > 0:
+        total_paid = float(booking.deposit_amount)
+    else:
+        total_paid = paid_sum
 
     if total_paid >= booking.total_amount:
         setattr(booking, "status", "completed")
@@ -63,18 +65,43 @@ def create_payment(payment: PaymentCreate, db: Session = Depends(get_db), curren
     if booking.status == "cancelled" and payment.status != "refunded":
         raise HTTPException(status_code=400, detail="Không thể ghi nhận thanh toán cho đơn đã hủy (chỉ cho phép ghi nhận hoàn tiền)")
         
+    from sqlalchemy import func
     if payment.status == "paid":
-        from sqlalchemy import func
         existing_paid = db.query(func.sum(Payment.amount)).filter(
             Payment.booking_id == payment.booking_id,
             Payment.status == "paid"
         ).scalar() or 0.0
-        total_collected = existing_paid + (booking.deposit_amount or 0.0)
+        
+        if existing_paid == 0.0 and (booking.deposit_amount or 0.0) > 0:
+            total_collected = float(booking.deposit_amount)
+        else:
+            total_collected = existing_paid
+
         remaining = max(0.0, (booking.total_amount or 0.0) - total_collected)
         if payment.amount > remaining:
             raise HTTPException(
                 status_code=400,
                 detail=f"Số tiền thanh toán ({payment.amount:,.0f}đ) vượt quá số tiền còn thiếu ({remaining:,.0f}đ)"
+            )
+            
+    if payment.status == "refunded":
+        total_paid = db.query(func.sum(Payment.amount)).filter(
+            Payment.booking_id == payment.booking_id,
+            Payment.status == "paid"
+        ).scalar() or 0.0
+        if total_paid == 0.0 and (booking.deposit_amount or 0.0) > 0:
+            total_paid = float(booking.deposit_amount)
+            
+        already_refunded = db.query(func.sum(Payment.amount)).filter(
+            Payment.booking_id == payment.booking_id,
+            Payment.status == "refunded"
+        ).scalar() or 0.0
+        
+        max_refundable = max(0.0, total_paid - already_refunded)
+        if payment.amount > max_refundable:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Số tiền hoàn ({payment.amount:,.0f}đ) vượt quá số tiền tối đa có thể hoàn ({max_refundable:,.0f}đ)"
             )
         
     new_payment = Payment(**payment.model_dump())
@@ -83,13 +110,11 @@ def create_payment(payment: PaymentCreate, db: Session = Depends(get_db), curren
         
     db.add(new_payment)
     
-    # Nếu là hoàn tiền cho booking đã hủy, cập nhật ghi chú booking và bảo toàn tiền cọc
+    # Nếu là hoàn tiền cho booking đã hủy, cập nhật ghi chú booking
     if new_payment.status == "refunded":
         refund_note = f" [Đã hoàn tiền {new_payment.amount:,.0f}đ]"
         if not booking.note or refund_note not in booking.note:
             booking.note = (booking.note or "") + refund_note # type: ignore
-        if not booking.deposit_amount or booking.deposit_amount <= 0:
-            booking.deposit_amount = new_payment.amount # type: ignore
             
     db.commit()
     db.refresh(new_payment)

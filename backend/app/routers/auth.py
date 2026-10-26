@@ -33,6 +33,9 @@ def register(user_in: UserCreate, request: Request, db: Session = Depends(get_db
         
         if not current_user or current_user.role != "admin":
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Chỉ Quản lý (Admin) mới có quyền thực hiện thao tác này")
+            
+        # Hệ thống chỉ cho phép tạo thêm tài khoản nhân viên (staff)
+        user_in.role = "staff"
     else:
         # Nếu DB trống, force role thành admin
         user_in.role = "admin"
