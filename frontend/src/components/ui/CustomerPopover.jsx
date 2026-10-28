@@ -3,20 +3,78 @@ import { Phone, Mail, MapPin, Calendar, CreditCard, Sparkles } from 'lucide-reac
 import { customersAPI } from '../../api';
 
 /**
- * Determine customer tier based on bookings count and spent
- * Thresholds: VIP (>= 500k VNĐ or >= 3 bookings), Loyal (>= 2 bookings), New (0-1 booking)
+ * Determine customer tier based on completed bookings and spent
+ * Thresholds: VIP (>= 500k VNĐ or >= 4 completed sessions), Loyal 'Khách quen' (>= 2 completed sessions), New (0-1 session)
  */
 export function getCustomerTier(stats) {
-  const total = stats?.total || stats?.booking_count || 0;
+  const completed = stats?.completedCount != null 
+    ? stats.completedCount 
+    : (stats?.completed_count != null ? stats.completed_count : 0);
   const spent = stats?.totalSpent || stats?.total_spent || 0;
 
-  if (spent >= 500000 || total >= 3) {
+  if (spent >= 500000 || completed >= 4) {
     return { id: 'vip', label: 'Khách VIP', icon: '👑', color: '#B45309', bg: '#FEF3C7', border: '#FDE68A' };
   }
-  if (total >= 2) {
-    return { id: 'loyal', label: 'Thân thiết', icon: '⭐', color: '#1D4ED8', bg: '#EFF6FF', border: '#BFDBFE' };
+  if (completed >= 2) {
+    return { id: 'loyal', label: 'Khách quen', icon: '⭐', color: '#1D4ED8', bg: '#EFF6FF', border: '#BFDBFE' };
   }
   return { id: 'new', label: 'Khách mới', icon: '👤', color: '#047857', bg: '#ECFDF5', border: '#A7F3D0' };
+}
+
+/**
+ * Standardize customer financial and booking calculations across the system
+ */
+export function computeCustomerFinancials(customerBookings = []) {
+  let totalSpent = 0;
+  let completedCount = 0;
+  let cancelledCount = 0;
+
+  for (const b of customerBookings) {
+    if (b.status === 'completed') {
+      completedCount++;
+      if (Array.isArray(b.payments) && b.payments.length > 0) {
+        const paid = b.payments.filter(p => p.status === 'paid').reduce((s, p) => s + Number(p.amount || 0), 0);
+        const refunded = b.payments.filter(p => p.status === 'refunded').reduce((s, p) => s + Number(p.amount || 0), 0);
+        totalSpent += Math.max(0, paid - refunded);
+      } else {
+        totalSpent += Number(b.total_amount || 0);
+      }
+    } else if (b.status === 'cancelled') {
+      cancelledCount++;
+      // Tiền cọc giữ lại phạt hủy sân (khách nộp cọc và trung tâm giữ lại khi hủy)
+      if (b.deposit_forfeited && (b.deposit_amount || 0) > 0) {
+        const hasRefund = Array.isArray(b.payments) && b.payments.some(p => p.status === 'refunded');
+        if (!hasRefund) {
+          totalSpent += Number(b.deposit_amount || 0);
+        }
+      }
+    } else if (b.status === 'confirmed') {
+      if (Array.isArray(b.payments) && b.payments.length > 0) {
+        const paid = b.payments.filter(p => p.status === 'paid').reduce((s, p) => s + Number(p.amount || 0), 0);
+        totalSpent += paid;
+      } else if (b.deposit_amount > 0) {
+        totalSpent += Number(b.deposit_amount || 0);
+      }
+    }
+  }
+
+  // Sort by date descending
+  const sortedBookings = [...customerBookings].sort((x, y) => {
+    const dateX = x.time_slot?.date || '';
+    const dateY = y.time_slot?.date || '';
+    return dateY.localeCompare(dateX);
+  });
+  const lastBookingDate = sortedBookings[0]?.time_slot?.date || null;
+  const tier = getCustomerTier({ completedCount, totalSpent });
+
+  return {
+    bookingCount: customerBookings.length,
+    completedCount,
+    cancelledCount,
+    totalSpent,
+    lastBookingDate,
+    tier
+  };
 }
 
 export default function CustomerPopover({
@@ -39,10 +97,13 @@ export default function CustomerPopover({
     if (customer) {
       setData(customer);
       if (customer.bookings) {
-        const valid = customer.bookings.filter(b => b.status !== 'cancelled');
+        const calc = computeCustomerFinancials(customer.bookings);
         setStats({
-          total: customer.bookings.length,
-          totalSpent: valid.reduce((sum, b) => sum + (b.total_amount || 0), 0)
+          total: calc.bookingCount,
+          completedCount: calc.completedCount,
+          cancelledCount: calc.cancelledCount,
+          totalSpent: calc.totalSpent,
+          tier: calc.tier
         });
       }
     }
@@ -56,10 +117,13 @@ export default function CustomerPopover({
       const res = await customersAPI.getOne(targetId);
       setData(res);
       const bookings = res.bookings || [];
-      const valid = bookings.filter(b => b.status !== 'cancelled');
+      const calc = computeCustomerFinancials(bookings);
       setStats({
-        total: bookings.length,
-        totalSpent: valid.reduce((sum, b) => sum + (b.total_amount || 0), 0)
+        total: calc.bookingCount,
+        completedCount: calc.completedCount,
+        cancelledCount: calc.cancelledCount,
+        totalSpent: calc.totalSpent,
+        tier: calc.tier
       });
     } catch {
       // fallback

@@ -3,6 +3,7 @@ import { X, Sparkles, Clock, AlertCircle, Info, RefreshCw, Lock } from 'lucide-r
 import { aiAPI, courtTypesAPI } from '../../api';
 import AICard from '../../components/AICard';
 import { Button, Input, Select } from '../../components/ui';
+import { todayVN } from '../../utils/datetime';
 
 /**
  * Modal AI gợi ý khung giờ trống (AI-1)
@@ -14,12 +15,12 @@ import { Button, Input, Select } from '../../components/ui';
  */
 export default function AISuggestModal({ isOpen, onClose, onSelectSlot }) {
   const [courtTypes, setCourtTypes] = useState([]);
-  const [form, setForm] = useState({
+  const [form, setForm] = useState(() => ({
     court_type_id: '',
-    preferred_date: new Date().toISOString().slice(0, 10),
+    preferred_date: todayVN(),
     preferred_start_time: '',
     preferred_end_time: '',
-  });
+  }));
 
   const [loading, setLoading]   = useState(false);
   const [result, setResult]     = useState(null); // { suggestions_text, matched_slots, message, is_fallback }
@@ -170,7 +171,7 @@ export default function AISuggestModal({ isOpen, onClose, onSelectSlot }) {
                   label="Ngày mong muốn"
                   type="date"
                   value={form.preferred_date}
-                  min={new Date().toISOString().slice(0, 10)}
+                  min={todayVN()}
                   onChange={e => setForm(f => ({ ...f, preferred_date: e.target.value }))}
                   required
                 />

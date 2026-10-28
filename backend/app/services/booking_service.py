@@ -73,18 +73,27 @@ def create_booking(db: Session, request: BookingCreateRequest, staff_id: int) ->
                     detail="Sân đang trong lịch bảo trì vào ngày này, không thể đặt hoặc đổi lịch"
                 )
 
-            # Kiểm tra số tiền cọc: 0 <= deposit_amount <= giá sân
+            # Tính toán thời lượng ca (theo giờ) để tính đúng giá tiền cho ca 60p, 90p, 120p,...
+            start_dt = datetime.combine(time_slot.date, time_slot.start_time)
+            end_dt = datetime.combine(time_slot.date, time_slot.end_time)
+            duration_hours = (end_dt - start_dt).total_seconds() / 3600.0
+            if duration_hours <= 0:
+                duration_hours = 1.0
+
+            slot_total_amount = round(court.price_per_hour * duration_hours)
+
+            # Kiểm tra số tiền cọc: 0 <= deposit_amount <= giá ca
             dep_amount = float(request.deposit_amount or 0.0)
-            if dep_amount < 0 or dep_amount > court.price_per_hour:
+            if dep_amount < 0 or dep_amount > slot_total_amount:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Tiền cọc không hợp lệ (phải từ 0đ đến tối đa {court.price_per_hour:,.0f}đ bằng giá sân)"
+                    detail=f"Tiền cọc không hợp lệ (phải từ 0đ đến tối đa {slot_total_amount:,.0f}đ bằng giá ca sân)"
                 )
                 
             # 1. Cập nhật status của khung giờ
             setattr(time_slot, "status", "booked")
             
-            # 2. Tạo booking (total_amount lấy chuẩn từ hệ thống, không tin tưởng client truyền lên)
+            # 2. Tạo booking (total_amount lấy chuẩn từ thời lượng ca x giá sân/giờ)
             new_booking = Booking(
                 customer_id=request.customer_id,
                 court_id=time_slot.court_id,
@@ -93,7 +102,7 @@ def create_booking(db: Session, request: BookingCreateRequest, staff_id: int) ->
                 status="pending",
                 deposit_amount=request.deposit_amount,
                 deposit_forfeited=False,
-                total_amount=court.price_per_hour,
+                total_amount=slot_total_amount,
                 note=request.note
             )
             

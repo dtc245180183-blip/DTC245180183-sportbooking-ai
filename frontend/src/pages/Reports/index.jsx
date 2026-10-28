@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   statisticsAPI,
   bookingsAPI,
@@ -24,6 +25,7 @@ import {
   Cell,
   BarChart,
 } from 'recharts';
+import { todayVN, addDays } from '../../utils/datetime';
 import {
   TrendingUp,
   DollarSign,
@@ -54,8 +56,9 @@ import {
   TrendingDown,
   HelpCircle,
 } from 'lucide-react';
-import { Card, Badge, Skeleton, Button, Input, Table, Pagination } from '../../components/ui';
+import { Card, Badge, Skeleton, Button, Input, Table, Pagination, useToast } from '../../components/ui';
 import AICard from '../../components/AICard';
+import AIReportViewer from '../../components/AIReportViewer';
 import './Reports.css';
 
 /* ── Custom Recharts Tooltip ────────────────────────── */
@@ -91,9 +94,20 @@ function CustomChartTooltip({ active, payload, label, formatter }) {
 const PIE_COLORS = ['#10B981', '#3B82F6', '#8B5CF6', '#F59E0B', '#EC4899', '#06B6D4', '#64748B'];
 
 export default function Reports() {
+  const { showToast } = useToast();
+  const [searchParams] = useSearchParams();
+  const tabFromUrl = searchParams.get('tab');
+  
   // ── States ───────────────────────────────────────────
-  const [activeTab, setActiveTab] = useState('revenue'); // 'revenue' | 'operations' | 'customers' | 'ai'
+  const [activeTab, setActiveTab] = useState(tabFromUrl === 'ai' ? 'ai' : (tabFromUrl || 'revenue')); // 'revenue' | 'operations' | 'customers' | 'ai'
   const [loading, setLoading]     = useState(true);
+
+  // Sync tab nếu URL search param thay đổi
+  useEffect(() => {
+    if (tabFromUrl && ['revenue', 'operations', 'customers', 'ai'].includes(tabFromUrl)) {
+      setActiveTab(tabFromUrl);
+    }
+  }, [tabFromUrl]);
 
   // Raw API data
   const [overview, setOverview]       = useState(null);
@@ -106,11 +120,12 @@ export default function Reports() {
   const [courtTypes, setCourtTypes]   = useState([]);
   const [customers, setCustomers]     = useState([]);
 
-  // AI Assistant state
-  const [aiSummary, setAiSummary]       = useState('');
-  const [aiRawData, setAiRawData]       = useState(null);
-  const [aiError, setAiError]           = useState('');
-  const [generatingAI, setGeneratingAI] = useState(false);
+  // AI Assistant state (Cố vấn Tài chính & Dự báo Doanh thu)
+  const [aiSummary, setAiSummary]             = useState('');
+  const [aiFinancialData, setAiFinancialData] = useState(null);
+  const [aiError, setAiError]                 = useState('');
+  const [generatingAI, setGeneratingAI]       = useState(false);
+  const [aiDateRange, setAiDateRange]         = useState(null);
 
   // Pagination for tables
   const [dailyPage, setDailyPage] = useState(1);
@@ -119,7 +134,7 @@ export default function Reports() {
   const cancelPageSize = 6;
 
   // ── Date range filters ───────────────────────────────
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayVN();
   const defaultFrom = '2026-09-01'; // Hiển thị toàn bộ phát sinh giao dịch hệ thống
   const [fromDate, setFromDate] = useState(defaultFrom);
   const [toDate, setToDate]     = useState(today);
@@ -132,11 +147,11 @@ export default function Reports() {
       setFromDate('2026-09-01');
       setToDate(today);
     } else if (preset === '30') {
-      const from = new Date(Date.now() - 29 * 86400000).toISOString().slice(0, 10);
+      const from = addDays(today, -29);
       setFromDate(from);
       setToDate(today);
     } else if (preset === '7') {
-      const from = new Date(Date.now() - 6 * 86400000).toISOString().slice(0, 10);
+      const from = addDays(today, -6);
       setFromDate(from);
       setToDate(today);
     } else if (preset === 'this_month') {
@@ -185,20 +200,28 @@ export default function Reports() {
 
   useEffect(() => {
     fetchData();
+    // Nếu người dùng thay đổi ngày phân tích và trước đó đã có báo cáo AI, xóa báo cáo cũ để tránh hiển thị sai lệch
+    if (aiDateRange && (aiDateRange.from !== fromDate || aiDateRange.to !== toDate)) {
+      setAiSummary('');
+      setAiFinancialData(null);
+      setAiError('');
+      setAiDateRange(null);
+    }
   }, [fromDate, toDate]);
 
-  // ── AI Generator ─────────────────────────────────────
+  // ── AI Generator: Cố vấn Tài chính & Dự báo Doanh thu AI ──
   const handleGenerateAI = async () => {
     setGeneratingAI(true);
     setAiSummary('');
-    setAiRawData(null);
+    setAiFinancialData(null);
     setAiError('');
     try {
-      const res = await aiAPI.occupancySummary({ from_date: fromDate, to_date: toDate });
+      const res = await aiAPI.financialInsights({ from_date: fromDate, to_date: toDate });
       setAiSummary(res.summary);
-      setAiRawData(res.raw_data);
+      setAiFinancialData(res.financial_data);
+      setAiDateRange({ from: fromDate, to: toDate });
     } catch (err) {
-      setAiError(err.response?.data?.detail || 'Lỗi không xác định khi gọi AI.');
+      setAiError(err.response?.data?.detail || 'Lỗi không xác định khi gọi Trợ lý AI Tài chính.');
     } finally {
       setGeneratingAI(false);
     }
@@ -675,8 +698,8 @@ export default function Reports() {
           onClick={() => setActiveTab('ai')}
         >
           <Sparkles size={16} style={{ color: '#7C3AED' }} />
-          <span>Trợ lý AI Chiến lược</span>
-          <span className="reports-tab-badge" style={{ background: '#EDE9FE', color: '#6D28D9' }}>AI BI</span>
+          <span>Cố vấn Tài chính AI</span>
+          <span className="reports-tab-badge" style={{ background: '#EDE9FE', color: '#6D28D9' }}>Dự báo &amp; Dòng tiền</span>
         </button>
       </div>
 
@@ -1541,79 +1564,131 @@ export default function Reports() {
       )}
 
       {/* ====================================================
-          TAB 4: TRỢ LÝ AI CHIẾN LƯỢC (AI BUSINESS INTELLIGENCE)
+          TAB 4: CỐ VẤN TÀI CHÍNH & DỰ BÁO DOANH THU AI
          ==================================================== */}
       {activeTab === 'ai' && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: '1.25rem', alignItems: 'start' }}>
-          {/* Cột trái: AI BI Output + Dynamic Pricing Strategies */}
+          {/* Cột trái: Financial Intelligence Overview + AI Analysis */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
             <div className="report-panel" style={{ background: '#FAF5FF', border: '1px solid #E9D5FF' }}>
               <div className="report-panel-header" style={{ marginBottom: '1rem' }}>
                 <div>
-                  <h3 className="report-panel-title" style={{ color: '#6D28D9' }}>
+                  <h3 className="report-panel-title" style={{ color: '#6D28D9', display: 'flex', alignItems: 'center', gap: 8 }}>
                     <Sparkles size={18} />
-                    Trung tâm Phân tích &amp; Khuyến nghị Chiến lược Kinh doanh (AI BI)
+                    Trung tâm Cố vấn Tài chính &amp; Dự báo Doanh thu AI
                   </h3>
-                  <p className="report-panel-sub">Ứng dụng mô hình AI Deep Learning phân tích ma trận dữ liệu và đề xuất hành động thực tiễn</p>
+                  <p className="report-panel-sub">
+                    Mô hình Gemini AI phân tích chuyên sâu dòng tiền thực thu, doanh thu ròng, hiệu quả kinh tế từng bộ môn và đề xuất chiến lược giá tối đa hóa lợi nhuận
+                  </p>
                 </div>
               </div>
 
-              {/* AI Strategic Action Cards */}
+              {/* 3 Trụ cột tư vấn tài chính */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginBottom: '1.25rem' }}>
                 <div style={{ background: '#FFFFFF', padding: '1rem', borderRadius: 10, border: '1px solid #E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#D97706', fontWeight: 700, fontSize: '0.85rem', marginBottom: 4 }}>
-                    <TrendingDown size={16} /> Dynamic Pricing
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#059669', fontWeight: 700, fontSize: '0.85rem', marginBottom: 4 }}>
+                    <DollarSign size={16} /> Quản trị Dòng tiền
                   </div>
                   <p style={{ fontSize: '0.78rem', color: '#475569', margin: 0, lineHeight: 1.5 }}>
-                    Giảm giá <strong>15 - 20%</strong> vào ca sáng (06:00 - 11:00) các ngày từ Thứ 2 đến Thứ 6 để bù đắp chi phí cố định cho sân.
+                    Theo dõi sát thực thu, tiền cọc giữ lại và tiền hoàn trả khách hủy để bảo vệ dòng tiền ròng an toàn cho tổ hợp.
                   </p>
                 </div>
 
                 <div style={{ background: '#FFFFFF', padding: '1rem', borderRadius: 10, border: '1px solid #E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#2563EB', fontWeight: 700, fontSize: '0.85rem', marginBottom: 4 }}>
-                    <Flame size={16} /> Bảo vệ Giờ Vàng
+                    <TrendingUp size={16} /> Hiệu quả theo Môn
                   </div>
                   <p style={{ fontSize: '0.78rem', color: '#475569', margin: 0, lineHeight: 1.5 }}>
-                    Áp dụng mức cọc <strong>50%</strong> cho khung giờ 17:00 - 21:00 và quy định hủy trước 12h để loại bỏ nguy cơ bùng sân giờ cao điểm.
+                    Phân tích tỷ trọng đóng góp của từng bộ môn (Bóng đá, Cầu lông, Bóng chuyền...) để tái đầu tư đúng trọng tâm.
                   </p>
                 </div>
 
                 <div style={{ background: '#FFFFFF', padding: '1rem', borderRadius: 10, border: '1px solid #E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#059669', fontWeight: 700, fontSize: '0.85rem', marginBottom: 4 }}>
-                    <Award size={16} /> Giữ chân Khách VIP
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#D97706', fontWeight: 700, fontSize: '0.85rem', marginBottom: 4 }}>
+                    <TrendingDown size={16} /> Chiến lược Giá &amp; Cọc
                   </div>
                   <p style={{ fontSize: '0.78rem', color: '#475569', margin: 0, lineHeight: 1.5 }}>
-                    Tặng voucher giảm 50.000đ hoặc chai nước thể thao miễn phí cho Top 5 khách quen khi đạt mốc từ 5 ca chơi/tháng.
+                    Đề xuất mức giá động theo giờ thấp điểm và chính sách cọc giờ vàng để tăng 15-25% biên lợi nhuận.
                   </p>
                 </div>
               </div>
 
-              {/* AI Generated Raw Data Chart */}
-              {aiRawData && Object.keys(aiRawData).length > 0 && (
-                <div style={{ background: '#FFFFFF', borderRadius: 10, padding: '1rem', border: '1px solid #E9D5FF', marginTop: '1rem' }}>
-                  <h4 style={{ fontSize: '0.88rem', fontWeight: 700, color: '#6D28D9', margin: '0 0 0.75rem' }}>
-                    Biểu đồ Phân tích Công suất Lấp đầy Khung giờ do AI tính toán
-                  </h4>
-                  <ResponsiveContainer width="100%" height={200}>
-                    <BarChart
-                      data={Object.entries(aiRawData).sort(([a],[b]) => a.localeCompare(b)).map(([hour, d]) => ({ hour, rate: d.occupancy_rate_percent }))}
-                      margin={{ top: 4, right: 4, left: 0, bottom: 0 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
-                      <XAxis dataKey="hour" tick={{ fill: '#64748B', fontSize: 10 }} tickLine={false} axisLine={false} />
-                      <YAxis tick={{ fill: '#64748B', fontSize: 10 }} tickLine={false} axisLine={false} unit="%" domain={[0, 100]} width={34} />
-                      <Tooltip formatter={v => `${v}%`} />
-                      <Bar dataKey="rate" fill="#8B5CF6" radius={[4, 4, 0, 0]} maxBarSize={22} />
-                    </BarChart>
-                  </ResponsiveContainer>
+              {/* Dữ liệu tài chính AI trích xuất (nếu đã kích hoạt) */}
+              {aiFinancialData && (
+                <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {/* KPI Bar */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem' }}>
+                    <div style={{ background: '#FFFFFF', borderRadius: 8, padding: '0.75rem', border: '1px solid #E2E8F0' }}>
+                      <p style={{ margin: 0, fontSize: '0.72rem', color: '#64748B', fontWeight: 600 }}>THỰC THU SỔ QUỸ</p>
+                      <p style={{ margin: '4px 0 0', fontSize: '1rem', fontWeight: 700, color: '#059669' }}>
+                        {aiFinancialData.kpis?.total_collected_formatted || '0đ'}
+                      </p>
+                    </div>
+
+                    <div style={{ background: '#FFFFFF', borderRadius: 8, padding: '0.75rem', border: '1px solid #E2E8F0' }}>
+                      <p style={{ margin: 0, fontSize: '0.72rem', color: '#64748B', fontWeight: 600 }}>DOANH THU THUẦN (NET)</p>
+                      <p style={{ margin: '4px 0 0', fontSize: '1rem', fontWeight: 700, color: '#2563EB' }}>
+                        {aiFinancialData.kpis?.net_revenue_formatted || '0đ'}
+                      </p>
+                    </div>
+
+                    <div style={{ background: '#FFFFFF', borderRadius: 8, padding: '0.75rem', border: '1px solid #E2E8F0' }}>
+                      <p style={{ margin: 0, fontSize: '0.72rem', color: '#64748B', fontWeight: 600 }}>GIÁ TRỊ ĐƠN TB (AOV)</p>
+                      <p style={{ margin: '4px 0 0', fontSize: '1rem', fontWeight: 700, color: '#7C3AED' }}>
+                        {aiFinancialData.kpis?.average_order_value_formatted || '0đ'}
+                      </p>
+                    </div>
+
+                    <div style={{ background: '#FFFFFF', borderRadius: 8, padding: '0.75rem', border: '1px solid #E2E8F0' }}>
+                      <p style={{ margin: 0, fontSize: '0.72rem', color: '#64748B', fontWeight: 600 }}>TỶ LỆ HỦY SÂN</p>
+                      <p style={{ margin: '4px 0 0', fontSize: '1rem', fontWeight: 700, color: aiFinancialData.kpis?.cancellation_rate_percent > 15 ? '#DC2626' : '#D97706' }}>
+                        {aiFinancialData.kpis?.cancellation_rate_percent || 0}%
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Biểu đồ phân bổ doanh thu theo Bộ môn do AI tổng hợp */}
+                  {aiFinancialData.revenue_by_court_type && Object.keys(aiFinancialData.revenue_by_court_type).length > 0 && (
+                    <div style={{ background: '#FFFFFF', borderRadius: 10, padding: '1rem', border: '1px solid #E9D5FF' }}>
+                      <h4 style={{ fontSize: '0.88rem', fontWeight: 700, color: '#6D28D9', margin: '0 0 0.75rem', display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <BarChart3 size={15} /> Doanh thu theo Từng Bộ môn Thể thao do AI Trích xuất
+                      </h4>
+                      <ResponsiveContainer width="100%" height={210}>
+                        <BarChart
+                          data={Object.entries(aiFinancialData.revenue_by_court_type).map(([name, d]) => ({
+                            name,
+                            revenue: d.revenue || 0,
+                            formatted: d.formatted || `${(d.revenue || 0).toLocaleString()}đ`,
+                          }))}
+                          margin={{ top: 10, right: 10, left: 10, bottom: 20 }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
+                          <XAxis dataKey="name" tick={{ fill: '#475569', fontSize: 11 }} tickLine={false} axisLine={false} />
+                          <YAxis tick={{ fill: '#64748B', fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={v => `${(v / 1000).toFixed(0)}k`} />
+                          <Tooltip formatter={(val) => [`${Number(val).toLocaleString()}đ`, 'Doanh thu']} />
+                          <Bar dataKey="revenue" fill="#6366F1" radius={[6, 6, 0, 0]} maxBarSize={36} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
 
             {/* AI Summary Text Container */}
             {(generatingAI || aiSummary || aiError) && (
-              <AICard loading={generatingAI} title="Báo cáo Tổng hợp Chiến lược AI" error={aiError}>
-                {aiSummary && <p className="ai-card-text" style={{ fontSize: '0.9rem', lineHeight: 1.6, whiteSpace: 'pre-line' }}>{aiSummary}</p>}
+              <AICard
+                loading={generatingAI}
+                title={`Báo cáo Toàn diện Cố vấn Tài chính AI (${aiDateRange?.from || fromDate} → ${aiDateRange?.to || toDate})`}
+                error={aiError}
+              >
+                {aiSummary && (
+                  <AIReportViewer
+                    content={aiSummary}
+                    period={`${aiDateRange?.from || fromDate} → ${aiDateRange?.to || toDate}`}
+                    onCopyToast={(msg) => showToast({ type: 'success', message: msg })}
+                  />
+                )}
               </AICard>
             )}
           </div>
@@ -1622,10 +1697,10 @@ export default function Reports() {
           <div style={{ position: 'sticky', top: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div className="report-panel" style={{ background: '#FFFFFF' }}>
               <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#6D28D9', margin: '0 0 0.75rem', display: 'flex', alignItems: 'center', gap: 6 }}>
-                <Sparkles size={16} /> Kích hoạt Phân tích AI
+                <Sparkles size={16} /> Kích hoạt Cố vấn Tài chính
               </h3>
               <p style={{ fontSize: '0.82rem', color: '#475569', marginBottom: '1.25rem', lineHeight: 1.5 }}>
-                Mô hình AI sẽ đối chiếu dữ liệu kinh doanh từ <strong style={{ color: '#0F172A' }}>{fromDate}</strong> đến <strong style={{ color: '#0F172A' }}>{toDate}</strong> để đưa ra góc nhìn chuẩn chuyên gia quản trị.
+                AI sẽ tổng hợp toàn bộ sổ quỹ thanh toán, tiền cọc, doanh thu từng môn và tỷ lệ hủy từ <strong style={{ color: '#0F172A' }}>{fromDate}</strong> đến <strong style={{ color: '#0F172A' }}>{toDate}</strong> để đưa ra góc nhìn chuyên gia tài chính.
               </p>
               <Button
                 variant="primary"
@@ -1634,12 +1709,12 @@ export default function Reports() {
                 style={{ width: '100%', background: 'linear-gradient(135deg, #6366F1, #8B5CF6)', boxShadow: '0 4px 12px rgba(99,102,241,0.25)' }}
                 onClick={handleGenerateAI}
               >
-                {generatingAI ? 'AI đang xử lý...' : 'Tạo Báo cáo Chiến lược AI'}
+                {generatingAI ? 'AI đang phân tích tài chính...' : 'Tạo Báo cáo Tài chính AI'}
               </Button>
 
               {(aiSummary || aiError) && (
                 <button
-                  onClick={() => { setAiSummary(''); setAiRawData(null); setAiError(''); }}
+                  onClick={() => { setAiSummary(''); setAiFinancialData(null); setAiError(''); }}
                   style={{ marginTop: 12, display: 'block', width: '100%', textAlign: 'center', background: 'none', border: 'none', color: '#64748B', fontSize: '0.78rem', cursor: 'pointer', textDecoration: 'underline' }}
                 >
                   Xóa kết quả phân tích
@@ -1649,10 +1724,11 @@ export default function Reports() {
 
             <div className="report-panel" style={{ background: '#F8FAFC', border: '1px dashed #CBD5E1' }}>
               <h4 style={{ fontSize: '0.82rem', fontWeight: 700, color: '#334155', margin: '0 0 6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                Ghi chú Nghiệp vụ
+                Phân biệt 2 tính năng AI
               </h4>
-              <p style={{ fontSize: '0.78rem', color: '#64748B', margin: 0, lineHeight: 1.5 }}>
-                Dữ liệu báo cáo được tổng hợp theo thời gian thực từ toàn bộ sổ quỹ thanh toán, tiền cọc và lịch đặt sân. Tất cả số liệu xuất Excel đều được mã hóa tiếng Việt chuẩn UTF-8.
+              <p style={{ fontSize: '0.78rem', color: '#64748B', margin: 0, lineHeight: 1.55 }}>
+                • <strong>Trang Trợ lý AI (/ai-assistant)</strong>: Tập trung phân tích công suất lấp đầy ca giờ (sáng/chiều/tối) và đề xuất voucher giờ vắng.<br/>
+                • <strong>Trang Báo cáo (/reports?tab=ai)</strong>: Cố vấn tài chính cấp quản lý, phân tích dòng tiền thực, doanh thu ròng và chiến lược định giá.
               </p>
             </div>
           </div>

@@ -511,7 +511,6 @@ export default function Payments() {
 
   // ── Table columns ────────────────────────────────────
   const columns = [
-    { key: 'id',          label: '#',           width: '60px',  render: v => `#${v}` },
     { key: 'booking_id',  label: 'Booking',     width: '80px',  render: v => `#${v}` },
     { key: 'bk_customer', label: 'Khách hàng',                  render: (_, r) => getCustomerName(r.booking_id) },
     { key: 'bk_court',    label: 'Sân',                         render: (_, r) => getCourtName(r.booking_id) },

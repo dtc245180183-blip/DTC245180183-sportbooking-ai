@@ -13,7 +13,7 @@ router = APIRouter(prefix="/customers", tags=["customers"])
 def get_customers(
     q: Optional[str] = None, 
     page: int = 1, 
-    limit: int = 10, 
+    limit: int = 1000, 
     db: Session = Depends(get_db), 
     current_user = Depends(get_current_user)
 ):

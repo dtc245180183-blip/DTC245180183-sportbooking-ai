@@ -1,7 +1,7 @@
 from pydantic import BaseModel, EmailStr, Field
 from datetime import datetime
 from typing import Optional, List
-from .booking import BookingResponse
+from .booking import BookingResponse, BookingDetailResponse
 
 class CustomerBase(BaseModel):
     full_name: str
@@ -9,6 +9,7 @@ class CustomerBase(BaseModel):
     email: Optional[EmailStr] = None
     address: Optional[str] = None
     note: Optional[str] = None
+    avatar_url: Optional[str] = None
 
 class CustomerCreate(CustomerBase):
     pass
@@ -19,6 +20,7 @@ class CustomerUpdate(BaseModel):
     email: Optional[EmailStr] = None
     address: Optional[str] = None
     note: Optional[str] = None
+    avatar_url: Optional[str] = None
 
 class CustomerResponse(CustomerBase):
     id: int
@@ -28,4 +30,5 @@ class CustomerResponse(CustomerBase):
         from_attributes = True
 
 class CustomerDetailResponse(CustomerResponse):
-    bookings: List[BookingResponse] = []
+    bookings: List[BookingDetailResponse] = []
+

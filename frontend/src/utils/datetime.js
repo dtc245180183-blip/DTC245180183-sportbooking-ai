@@ -64,6 +64,34 @@ export function todayVN(refDate = new Date()) {
 }
 
 /**
+ * Cộng/trừ số ngày từ một chuỗi ngày 'YYYY-MM-DD'
+ * Tránh hoàn toàn lỗi lệch múi giờ (timezone drift / midnight rollover)
+ */
+export function addDays(dateStr, days = 0) {
+  if (!dateStr) return todayVN();
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const target = new Date(Date.UTC(y, m - 1, d + days));
+  return target.toISOString().slice(0, 10);
+}
+
+/**
+ * Format chuỗi ngày YYYY-MM-DD ra thứ ngày tháng tiếng Việt đầy đủ
+ * Ví dụ: "Thứ Ba, 27/10/2026"
+ */
+export function formatVNDateLong(dateStr) {
+  if (!dateStr) return '—';
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const target = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+  return target.toLocaleDateString('vi-VN', {
+    timeZone: VN_TZ,
+    weekday: 'long',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  });
+}
+
+/**
  * Lấy tổng số phút từ đầu ngày theo giờ Việt Nam (0 - 1439)
  */
 export function currentMinutesVN(dateObj = new Date()) {

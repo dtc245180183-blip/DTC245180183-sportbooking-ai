@@ -10,6 +10,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../components/ui/Toast';
 import { Button, Card, Badge, Modal, Input, Select, Skeleton } from '../../components/ui';
 import { useNavigate } from 'react-router-dom';
+import { todayVN, addDays, formatVNDateLong } from '../../utils/datetime';
 import './TimeSlots.css';
 
 /* ── Sport Metadata Helper (Icons, Badges, Colors) ── */
@@ -39,22 +40,23 @@ const STATUS_CONFIG = {
 
 /* ── Helper: generate 7 dates around center date ── */
 const getWeekDays = (centerDateStr) => {
-  const center = new Date(centerDateStr);
   const days = [];
   const DOW_NAMES = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+  const todayStr = todayVN();
 
   for (let offset = -3; offset <= 3; offset++) {
-    const d = new Date(center);
-    d.setDate(center.getDate() + offset);
-    const dateStr = d.toISOString().slice(0, 10);
-    const dow = DOW_NAMES[d.getDay()];
-    const isToday = dateStr === new Date().toISOString().slice(0, 10);
+    const dateStr = addDays(centerDateStr, offset);
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const targetDate = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+    const dow = DOW_NAMES[targetDate.getUTCDay()];
+    const isToday = dateStr === todayStr;
+    const isTomorrow = dateStr === addDays(todayStr, 1);
     days.push({
       dateStr,
-      dayNum: d.getDate(),
+      dayNum: d,
       dow,
       isToday,
-      label: isToday ? 'Hôm nay' : (offset === 1 ? 'Ngày mai' : dow),
+      label: isToday ? 'Hôm nay' : (isTomorrow ? 'Ngày mai' : dow),
     });
   }
   return days;
@@ -69,7 +71,7 @@ export default function TimeSlots() {
 
   // Navigation & View States
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'matrix'
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
+  const [selectedDate, setSelectedDate] = useState(() => todayVN());
   const [selectedCourt, setSelectedCourt] = useState('');
   const [statusFilter, setStatusFilter] = useState('all'); // 'all' | 'available' | 'booked' | 'blocked'
 
@@ -91,14 +93,14 @@ export default function TimeSlots() {
   // Modals
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [generating, setGenerating] = useState(false);
-  const [bulkForm, setBulkForm] = useState({
+  const [bulkForm, setBulkForm] = useState(() => ({
     court_id: '',
-    start_date: new Date().toISOString().slice(0, 10),
-    end_date: new Date().toISOString().slice(0, 10),
+    start_date: todayVN(),
+    end_date: todayVN(),
     start_hour: 6,
     end_hour: 22,
     duration_minutes: 60,
-  });
+  }));
 
   // Modal: View Booking Detail
   const [activeBooking, setActiveBooking] = useState(null);
@@ -383,7 +385,7 @@ export default function TimeSlots() {
     }
     setGenerating(true);
     try {
-      const durationHours = Math.max(1, Math.round(bulkForm.duration_minutes / 60));
+      const durationMinutes = parseInt(bulkForm.duration_minutes) || 60;
       if (courtId === 'all') {
         let totalCreated = 0;
         let totalSkipped = 0;
@@ -394,7 +396,8 @@ export default function TimeSlots() {
             date_to: bulkForm.end_date,
             start_hour: parseInt(bulkForm.start_hour),
             end_hour: parseInt(bulkForm.end_hour),
-            slot_duration_hours: durationHours,
+            duration_minutes: durationMinutes,
+            slot_duration_hours: durationMinutes / 60,
           };
           const res = await timeSlotsAPI.generate(payload);
           totalCreated += (res.created_count || 0);
@@ -411,7 +414,8 @@ export default function TimeSlots() {
           date_to: bulkForm.end_date,
           start_hour: parseInt(bulkForm.start_hour),
           end_hour: parseInt(bulkForm.end_hour),
-          slot_duration_hours: durationHours,
+          duration_minutes: durationMinutes,
+          slot_duration_hours: durationMinutes / 60,
         };
         const result = await timeSlotsAPI.generate(payload);
         const courtName = courts.find(c => c.id === parseInt(courtId))?.name || '';
@@ -434,19 +438,15 @@ export default function TimeSlots() {
   const weekDays = useMemo(() => getWeekDays(selectedDate), [selectedDate]);
 
   const handlePrevDay = () => {
-    const d = new Date(selectedDate);
-    d.setDate(d.getDate() - 1);
-    setSelectedDate(d.toISOString().slice(0, 10));
+    setSelectedDate(prev => addDays(prev, -1));
   };
 
   const handleNextDay = () => {
-    const d = new Date(selectedDate);
-    d.setDate(d.getDate() + 1);
-    setSelectedDate(d.toISOString().slice(0, 10));
+    setSelectedDate(prev => addDays(prev, 1));
   };
 
   const handleToday = () => {
-    setSelectedDate(new Date().toISOString().slice(0, 10));
+    setSelectedDate(todayVN());
   };
 
   return (
@@ -498,7 +498,7 @@ export default function TimeSlots() {
         <div className="date-nav-header">
           <div className="date-nav-label">
             <Calendar size={18} style={{ color: '#2563EB' }} />
-            <span>Thời gian vận hành: <strong>{new Date(selectedDate).toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}</strong></span>
+            <span>Thời gian vận hành: <strong>{formatVNDateLong(selectedDate)}</strong></span>
           </div>
 
           <div className="date-nav-controls">
@@ -1173,12 +1173,13 @@ export default function TimeSlots() {
                 onChange={e => setBulkForm(p => ({ ...p, duration_minutes: parseInt(e.target.value) }))}
                 options={[
                   { value: 60, label: '60 phút (Tiêu chuẩn 1 giờ/ca)' },
+                  { value: 90, label: '90 phút (1 tiếng rưỡi/ca - Chuẩn đá bóng phong trào)' },
                   { value: 120, label: '120 phút (2 giờ/ca)' },
                 ]}
               />
 
               <div style={{ background: '#F8FAFC', border: '1px dashed #CBD5E1', borderRadius: 8, padding: '0.75rem', fontSize: '0.78rem', color: '#475569' }}>
-                💡 <strong>Dự kiến:</strong> Mỗi ngày sinh khoảng <strong>{Math.max(0, Math.floor((parseInt(bulkForm.end_hour) - parseInt(bulkForm.start_hour)) / (bulkForm.duration_minutes / 60)))} ca</strong> từ {bulkForm.start_hour}:00 đến {bulkForm.end_hour}:00{bulkForm.court_id === 'all' ? ` cho tất cả ${courts.length} sân` : ''}.
+                💡 <strong>Dự kiến:</strong> Mỗi ngày sinh khoảng <strong>{Math.max(0, Math.floor(((parseInt(bulkForm.end_hour) - parseInt(bulkForm.start_hour)) * 60) / (bulkForm.duration_minutes || 60)))} ca</strong> từ {bulkForm.start_hour}:00 đến {bulkForm.end_hour}:00{bulkForm.court_id === 'all' ? ` cho tất cả ${courts.length} sân` : ''}.
               </div>
             </div>
 

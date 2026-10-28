@@ -166,14 +166,27 @@ export default function BookingDetailPanel({ isOpen, onClose, slot, court, court
                           <b style={{ color: 'var(--primary-color)' }}>{new Intl.NumberFormat('vi-VN').format(booking.total_amount)}đ</b>
                         )}
                       </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span className="text-secondary">Đã cọc:</span>
-                        <b style={{ color: '#16A34A' }}>{new Intl.NumberFormat('vi-VN').format(booking.deposit_amount)}đ</b>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed var(--border-color)', paddingTop: '0.25rem', marginTop: '0.25rem' }}>
-                        <span className="text-secondary">Còn lại:</span>
-                        <b style={{ color: '#DC2626' }}>{new Intl.NumberFormat('vi-VN').format(booking.total_amount - booking.deposit_amount)}đ</b>
-                      </div>
+                      {booking.deposit_amount > 0 && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span className="text-secondary">Đã cọc:</span>
+                          <b style={{ color: '#16A34A' }}>{new Intl.NumberFormat('vi-VN').format(booking.deposit_amount)}đ</b>
+                        </div>
+                      )}
+                      {(() => {
+                        const paidPayments = booking.payments?.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0) || 0;
+                        const totalPaid = booking.status === 'completed'
+                          ? (booking.total_amount || 0)
+                          : (paidPayments > 0 ? paidPayments : (booking.deposit_amount || 0));
+                        const remaining = Math.max(0, (booking.total_amount || 0) - totalPaid);
+                        return (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed var(--border-color)', paddingTop: '0.25rem', marginTop: '0.25rem' }}>
+                            <span className="text-secondary">Còn lại:</span>
+                            <b style={{ color: remaining > 0 ? '#DC2626' : '#16A34A' }}>
+                              {new Intl.NumberFormat('vi-VN').format(remaining)}đ {remaining === 0 && '(Đã đủ)'}
+                            </b>
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
                 </div>

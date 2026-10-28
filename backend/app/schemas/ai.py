@@ -26,3 +26,7 @@ class GenerateMessageResponse(BaseModel):
 class OccupancySummaryResponse(BaseModel):
     summary: str
     raw_data: Dict[str, Any]
+
+class FinancialInsightsResponse(BaseModel):
+    summary: str
+    financial_data: Dict[str, Any]
