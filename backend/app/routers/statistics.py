@@ -54,27 +54,11 @@ def get_overview(db: Session = Depends(get_db), current_user = Depends(get_curre
     
     total_deposit_query = deposit_from_active + deposit_from_cancelled
 
-    # Doanh thu hôm nay = đã thu hôm nay − hoàn trả hôm nay (Chỉ tính giao dịch paid/refunded trong ngày hôm nay theo giờ VN UTC+7)
-    tz_vn = timezone(timedelta(hours=7))
-    now_vn = datetime.now(tz_vn)
-    today_vn = now_vn.date()
-
-    def get_payment_vn_date(p_paid_at):
-        if not p_paid_at:
-            return None
-        if p_paid_at.tzinfo is None:
-            return (p_paid_at + timedelta(hours=7)).date()
-        return p_paid_at.astimezone(tz_vn).date()
-
+    # Doanh thu hôm nay = đã thu hôm nay − hoàn trả hôm nay
+    today = date.today()
     all_payments = db.query(Payment).all()
-    today_paid = sum(
-        p.amount for p in all_payments 
-        if p.status == "paid" and p.paid_at and get_payment_vn_date(p.paid_at) == today_vn
-    )
-    today_refunded = sum(
-        p.amount for p in all_payments 
-        if p.status == "refunded" and p.paid_at and get_payment_vn_date(p.paid_at) == today_vn
-    )
+    today_paid = sum(p.amount for p in all_payments if p.status == "paid" and p.paid_at and p.paid_at.date() == today)
+    today_refunded = sum(p.amount for p in all_payments if p.status == "refunded" and p.paid_at and p.paid_at.date() == today)
     today_revenue = max(0.0, today_paid - today_refunded)
     
     # Tổng số bookings (completed or confirmed)
@@ -83,7 +67,7 @@ def get_overview(db: Session = Depends(get_db), current_user = Depends(get_curre
     # Số booking hôm nay
     today_bookings = db.query(Booking).join(TimeSlot).filter(
         Booking.status.in_(["confirmed", "completed"]),
-        TimeSlot.date == today_vn
+        TimeSlot.date == today
     ).count()
     
     # Công suất trung bình tổng thể
@@ -92,8 +76,8 @@ def get_overview(db: Session = Depends(get_db), current_user = Depends(get_curre
     avg_occupancy_rate = (booked_slots / total_slots * 100) if total_slots > 0 else 0.0
     
     # Công suất hôm nay
-    today_total_slots = db.query(TimeSlot).filter(TimeSlot.date == today_vn).count()
-    today_booked_slots = db.query(TimeSlot).filter(TimeSlot.date == today_vn, TimeSlot.status == "booked").count()
+    today_total_slots = db.query(TimeSlot).filter(TimeSlot.date == today).count()
+    today_booked_slots = db.query(TimeSlot).filter(TimeSlot.date == today, TimeSlot.status == "booked").count()
     today_occupancy_rate = (today_booked_slots / today_total_slots * 100) if today_total_slots > 0 else 0.0
     
     # Tình trạng sân

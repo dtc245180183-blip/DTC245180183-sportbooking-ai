@@ -459,16 +459,9 @@ def generate_message(booking_id: int, message_type: str = "confirmation", db: Se
         log_type = "reminder_message"
 
     
-    # 4. Generate & Log (Bảo đảm chuẩn dữ liệu 100% kể cả khi Gemini lỗi hoặc quá tải)
-    call_ctx = gemini_client.GeminiCallContext()
-    try:
-        output_text = gemini_client.generate(system_prompt, user_prompt, timeout=12.0, context=call_ctx)
-        output_text = normalize_ai_message(output_text)
-        if not output_text or len(output_text.strip()) < 20:
-            output_text = _build_fallback_message(message_type, customer_name, court_name, book_date, start_time, end_time, booking.deposit_amount, booking.total_amount, remaining_amount)
-    except Exception as exc:
-        logger.warning(f"Generate message Gemini call failed: {exc}. Using standard fallback.")
-        output_text = _build_fallback_message(message_type, customer_name, court_name, book_date, start_time, end_time, booking.deposit_amount, booking.total_amount, remaining_amount)
+    # 4. Generate & Log
+    output_text = gemini_client.generate(system_prompt, user_prompt)
+    output_text = normalize_ai_message(output_text)
     
     ai_log_service.save_log(db, log_type=log_type, input_data={"booking_id": booking_id, "message_type": message_type}, output_text=output_text)
     
@@ -514,15 +507,8 @@ def occupancy_summary(from_date: date, to_date: date, db: Session = Depends(get_
     system_prompt = OCCUPANCY_SUMMARY_SYSTEM
     user_prompt = build_occupancy_summary_user_prompt(from_date, to_date, raw_data)
     
-    # 4. Generate & Log (Có cơ chế Fallback thông minh khi Gemini hết quota hoặc timeout)
-    call_ctx = gemini_client.GeminiCallContext()
-    try:
-        output_text = gemini_client.generate(system_prompt, user_prompt, timeout=12.0, context=call_ctx)
-        if not output_text or len(output_text.strip()) < 20:
-            output_text = _build_fallback_occupancy_summary(raw_data, from_date, to_date)
-    except Exception as exc:
-        logger.warning(f"Occupancy summary Gemini call failed: {exc}. Using fallback.")
-        output_text = _build_fallback_occupancy_summary(raw_data, from_date, to_date)
+    # 4. Generate & Log
+    output_text = gemini_client.generate(system_prompt, user_prompt)
     
     input_data = {"from_date": str(from_date), "to_date": str(to_date), "raw_data": raw_data}
     ai_log_service.save_log(db, log_type="revenue_summary", input_data=input_data, output_text=output_text)
