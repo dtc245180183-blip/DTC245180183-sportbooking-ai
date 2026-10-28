@@ -53,11 +53,23 @@ def generate_time_slots(request: GenerateSlotsRequest, db: Session = Depends(get
         raise HTTPException(status_code=400, detail="date_from phải nhỏ hơn hoặc bằng date_to")
     if request.start_hour >= request.end_hour:
         raise HTTPException(status_code=400, detail="start_hour phải nhỏ hơn end_hour")
-    span_hours = request.end_hour - request.start_hour
-    if span_hours % request.slot_duration_hours != 0:
+
+    # Xác định thời lượng ca theo phút (hỗ trợ 60p, 90p, 120p,...)
+    if request.duration_minutes:
+        duration_mins = int(request.duration_minutes)
+    elif request.slot_duration_hours:
+        duration_mins = int(round(request.slot_duration_hours * 60))
+    else:
+        duration_mins = 60
+
+    if duration_mins < 15:
+        raise HTTPException(status_code=400, detail="Thời lượng ca tối thiểu là 15 phút")
+
+    span_mins = (request.end_hour - request.start_hour) * 60
+    if span_mins < duration_mins:
         raise HTTPException(
             status_code=400,
-            detail=f"slot_duration_hours ({request.slot_duration_hours}) phải chia hết khoảng ({span_hours} giờ)"
+            detail=f"Thời gian mở cửa ({request.end_hour - request.start_hour} giờ) phải lớn hơn hoặc bằng thời lượng ca ({duration_mins} phút)"
         )
 
     # Validate court exists
@@ -78,9 +90,11 @@ def generate_time_slots(request: GenerateSlotsRequest, db: Session = Depends(get
     skipped = 0
     current_date = request.date_from
     while current_date <= request.date_to:
-        for hour_offset in range(0, span_hours, request.slot_duration_hours):
-            slot_start = (datetime.combine(current_date, datetime.min.time()) + timedelta(hours=request.start_hour + hour_offset)).time()
-            slot_end   = (datetime.combine(current_date, datetime.min.time()) + timedelta(hours=request.start_hour + hour_offset + request.slot_duration_hours)).time()
+        for offset in range(0, span_mins - duration_mins + 1, duration_mins):
+            start_dt = datetime.combine(current_date, datetime.min.time()) + timedelta(hours=request.start_hour, minutes=offset)
+            end_dt = start_dt + timedelta(minutes=duration_mins)
+            slot_start = start_dt.time()
+            slot_end = end_dt.time()
             key = (str(current_date), str(slot_start))
             if key in existing_keys:
                 skipped += 1

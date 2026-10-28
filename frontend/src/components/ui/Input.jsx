@@ -8,10 +8,13 @@ import { forwardRef } from 'react';
  * @param {string} hint — text gợi ý nhỏ bên dưới
  */
 const Input = forwardRef(function Input(
-  { label, error, icon, hint, className = '', id, style, ...rest },
+  { label, error, icon, rightElement, hint, className = '', id, style, ...rest },
   ref
 ) {
   const inputId = id ?? label?.toLowerCase().replace(/\s+/g, '-');
+
+  const paddingLeft = icon ? '40px' : '14px';
+  const paddingRight = rightElement ? '42px' : '14px';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -59,7 +62,7 @@ const Input = forwardRef(function Input(
             background: rest.disabled ? '#F1F5F9' : '#FFFFFF',
             cursor: rest.disabled ? 'not-allowed' : 'text',
             border: `1px solid ${error ? '#EF4444' : rest.disabled ? '#E2E8F0' : '#CBD5E1'}`,
-            padding: icon ? '10px 14px 10px 40px' : '10px 14px',
+            padding: `10px ${paddingRight} 10px ${paddingLeft}`,
             outline: 'none',
             appearance: 'none',
             WebkitAppearance: 'none',
@@ -80,6 +83,20 @@ const Input = forwardRef(function Input(
           }}
           {...rest}
         />
+        {rightElement && (
+          <div
+            style={{
+              position: 'absolute',
+              right: 12,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              display: 'flex',
+              alignItems: 'center',
+            }}
+          >
+            {rightElement}
+          </div>
+        )}
       </div>
       {error && (
         <p style={{ fontSize: '0.75rem', color: '#EF4444', margin: 0 }}>{error}</p>

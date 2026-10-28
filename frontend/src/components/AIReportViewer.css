@@ -1,0 +1,385 @@
+/* ─────────────────────────────────────────────────────────────
+   AI Report Viewer - Executive BI Styling (No Crowded Text)
+   ───────────────────────────────────────────────────────────── */
+
+.ai-report-viewer {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  font-family: inherit;
+  color: #1E293B;
+}
+
+/* Header & Controls Bar */
+.ai-report-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.ai-report-period-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #475569;
+  background: #F1F5F9;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid #E2E8F0;
+}
+
+.ai-report-period-badge strong {
+  color: #0F172A;
+}
+
+.ai-report-tools {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ai-view-mode-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 8px;
+  border: 1px solid #E2E8F0;
+  background: #FFFFFF;
+  color: #64748B;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.ai-view-mode-btn:hover {
+  background: #F8FAFC;
+  color: #0F172A;
+}
+
+.ai-view-mode-btn.active {
+  background: #6366F1;
+  color: #FFFFFF;
+  border-color: #6366F1;
+  box-shadow: 0 2px 6px rgba(99, 102, 241, 0.25);
+}
+
+.ai-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 8px;
+  border: 1px solid #CBD5E1;
+  background: #FFFFFF;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.ai-copy-btn:hover {
+  background: #F8FAFC;
+  border-color: #94A3B8;
+  color: #0F172A;
+}
+
+.ai-copy-btn.copied {
+  background: #ECFDF5;
+  color: #059669;
+  border-color: #A7F3D0;
+}
+
+/* Introduction / Executive Summary Banner */
+.ai-report-intro-box {
+  background: linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%);
+  border: 1px solid #E2E8F0;
+  border-left: 4px solid #6366F1;
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  font-size: 0.9rem;
+  line-height: 1.7;
+  color: #334155;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+
+.ai-report-intro-box p {
+  margin: 0;
+}
+
+/* Sections Container */
+.ai-report-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+/* Executive Section Card */
+.ai-section-card {
+  background: #FFFFFF;
+  border-radius: 14px;
+  border: 1px solid #E2E8F0;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.ai-section-card:hover {
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
+}
+
+/* Section Header */
+.ai-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.9rem 1.25rem;
+  border-bottom: 1px solid #F1F5F9;
+  cursor: pointer;
+  user-select: none;
+}
+
+.ai-section-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ai-section-icon-box {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.ai-section-title {
+  margin: 0;
+  font-size: 0.98rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.ai-section-body {
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+/* Theme Colors */
+/* 1. Emerald (Dòng tiền / Doanh thu) */
+.ai-theme-emerald {
+  border-top: 3px solid #10B981;
+}
+.ai-theme-emerald .ai-section-header {
+  background: #F0FDF4;
+}
+.ai-theme-emerald .ai-section-icon-box {
+  background: #DCFCE7;
+  color: #059669;
+}
+.ai-theme-emerald .ai-section-title {
+  color: #065F46;
+}
+
+/* 2. Indigo (Hiệu quả / Môn / Sân) */
+.ai-theme-indigo {
+  border-top: 3px solid #6366F1;
+}
+.ai-theme-indigo .ai-section-header {
+  background: #EEF2FF;
+}
+.ai-theme-indigo .ai-section-icon-box {
+  background: #E0E7FF;
+  color: #4F46E5;
+}
+.ai-theme-indigo .ai-section-title {
+  color: #3730A3;
+}
+
+/* 3. Amber (Xu hướng / Rủi ro) */
+.ai-theme-amber {
+  border-top: 3px solid #F59E0B;
+}
+.ai-theme-amber .ai-section-header {
+  background: #FFFBEB;
+}
+.ai-theme-amber .ai-section-icon-box {
+  background: #FEF3C7;
+  color: #D97706;
+}
+.ai-theme-amber .ai-section-title {
+  color: #92400E;
+}
+
+/* 4. Purple (Chiến lược / Đề xuất giá) */
+.ai-theme-purple {
+  border-top: 3px solid #8B5CF6;
+}
+.ai-theme-purple .ai-section-header {
+  background: #FAF5FF;
+}
+.ai-theme-purple .ai-section-icon-box {
+  background: #F3E8FF;
+  color: #7C3AED;
+}
+.ai-theme-purple .ai-section-title {
+  color: #5B21B6;
+}
+
+/* Item Rows inside Cards */
+.ai-item-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  line-height: 1.75;
+  font-size: 0.88rem;
+  color: #334155;
+  padding: 0.35rem 0;
+  border-bottom: 1px dashed #F1F5F9;
+}
+
+.ai-item-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.ai-item-bullet {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  margin-top: 9px;
+  flex-shrink: 0;
+  background: #6366F1;
+}
+
+.ai-item-subrow {
+  margin-left: 1.25rem;
+  padding-left: 0.5rem;
+  border-left: 2px solid #EEF2FF;
+}
+
+.ai-sub-bullet {
+  width: 5px;
+  height: 5px;
+  background: transparent;
+  border: 1.5px solid #818CF8;
+}
+
+.ai-item-content {
+  flex: 1;
+}
+
+/* Subheading inside section */
+.ai-item-subheader {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: #0F172A;
+  margin: 0.75rem 0 0.25rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ai-item-subheader::before {
+  content: "";
+  display: inline-block;
+  width: 3px;
+  height: 14px;
+  background: #6366F1;
+  border-radius: 2px;
+}
+
+/* Metrics & Value Badges */
+.ai-metric-money {
+  display: inline-block;
+  background: #ECFDF5;
+  color: #047857;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 5px;
+  border: 1px solid #A7F3D0;
+  font-size: 0.88rem;
+  white-space: nowrap;
+}
+
+.ai-metric-pct {
+  display: inline-block;
+  background: #EFF6FF;
+  color: #1D4ED8;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 5px;
+  border: 1px solid #BFDBFE;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.ai-text-bold {
+  color: #0F172A;
+  font-weight: 700;
+}
+
+.ai-text-em {
+  color: #4338CA;
+  font-style: normal;
+  font-weight: 600;
+}
+
+/* Document Readable Mode */
+.ai-doc-view {
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 14px;
+  padding: 2rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.ai-doc-section {
+  margin-bottom: 2rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid #E2E8F0;
+}
+
+.ai-doc-section:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.ai-doc-heading {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #0F172A;
+  margin: 0 0 1rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ai-doc-content {
+  font-size: 0.92rem;
+  line-height: 1.85;
+  color: #334155;
+}
+
+.ai-doc-content p {
+  margin: 0 0 0.85rem;
+}

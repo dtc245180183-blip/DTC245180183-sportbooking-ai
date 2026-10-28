@@ -35,8 +35,10 @@ class GenerateSlotsRequest(BaseModel):
     date_to: date
     start_hour: int = Field(default=6, ge=0, le=23)
     end_hour: int = Field(default=22, ge=1, le=24)
-    slot_duration_hours: int = Field(default=1, ge=1)
+    slot_duration_hours: Optional[float] = Field(default=1.0)
+    duration_minutes: Optional[int] = Field(default=None, ge=30)
 
 class GenerateSlotsResponse(BaseModel):
     created_count: int
     skipped_count: int
+

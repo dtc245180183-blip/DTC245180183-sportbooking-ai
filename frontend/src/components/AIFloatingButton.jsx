@@ -260,8 +260,8 @@ export default function AIFloatingButton() {
           {(isAdmin || tab === 'links') && (
             <div style={{ padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               {(isAdmin ? [
-                { to: '/ai-assistant', icon: '📈', title: 'Phân tích công suất AI (UC-12)', desc: 'Tóm tắt công suất & gợi ý khuyến mại' },
-                { to: '/reports',      icon: '📊', title: 'Báo cáo & Thống kê AI',         desc: 'Xem báo cáo doanh thu & tỷ lệ lấp đầy' },
+                { to: '/ai-assistant',    icon: '📈', title: 'Phân tích công suất & Giờ vàng',     desc: 'Tóm tắt ca giờ cao/thấp điểm & gợi ý khuyến mại (UC-12)' },
+                { to: '/reports?tab=ai',  icon: '💰', title: 'Cố vấn Tài chính & Doanh thu AI',   desc: 'Đánh giá dòng tiền, sinh lời & dự báo tăng trưởng' },
               ] : [
                 { to: '/schedule',     icon: '📅', title: 'Gợi ý khung giờ AI (UC-10)',   desc: 'Dùng nút "Nhờ AI gợi ý" ở trang Lịch' },
                 { to: '/ai-assistant', icon: '✨', title: 'Soạn tin nhắn khách (UC-11)',   desc: 'Xác nhận & nhắc lịch tự động' },

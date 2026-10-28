@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import List, Optional
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 from app.database import get_db
 from app.models.payment import Payment
@@ -54,11 +54,27 @@ def get_overview(db: Session = Depends(get_db), current_user = Depends(get_curre
     
     total_deposit_query = deposit_from_active + deposit_from_cancelled
 
-    # Doanh thu hôm nay = đã thu hôm nay − hoàn trả hôm nay
-    today = date.today()
+    # Doanh thu hôm nay = đã thu hôm nay − hoàn trả hôm nay (Chỉ tính giao dịch paid/refunded trong ngày hôm nay theo giờ VN UTC+7)
+    tz_vn = timezone(timedelta(hours=7))
+    now_vn = datetime.now(tz_vn)
+    today_vn = now_vn.date()
+
+    def get_payment_vn_date(p_paid_at):
+        if not p_paid_at:
+            return None
+        if p_paid_at.tzinfo is None:
+            return (p_paid_at + timedelta(hours=7)).date()
+        return p_paid_at.astimezone(tz_vn).date()
+
     all_payments = db.query(Payment).all()
-    today_paid = sum(p.amount for p in all_payments if p.status == "paid" and p.paid_at and p.paid_at.date() == today)
-    today_refunded = sum(p.amount for p in all_payments if p.status == "refunded" and p.paid_at and p.paid_at.date() == today)
+    today_paid = sum(
+        p.amount for p in all_payments 
+        if p.status == "paid" and p.paid_at and get_payment_vn_date(p.paid_at) == today_vn
+    )
+    today_refunded = sum(
+        p.amount for p in all_payments 
+        if p.status == "refunded" and p.paid_at and get_payment_vn_date(p.paid_at) == today_vn
+    )
     today_revenue = max(0.0, today_paid - today_refunded)
     
     # Tổng số bookings (completed or confirmed)
@@ -67,7 +83,7 @@ def get_overview(db: Session = Depends(get_db), current_user = Depends(get_curre
     # Số booking hôm nay
     today_bookings = db.query(Booking).join(TimeSlot).filter(
         Booking.status.in_(["confirmed", "completed"]),
-        TimeSlot.date == today
+        TimeSlot.date == today_vn
     ).count()
     
     # Công suất trung bình tổng thể
@@ -76,21 +92,21 @@ def get_overview(db: Session = Depends(get_db), current_user = Depends(get_curre
     avg_occupancy_rate = (booked_slots / total_slots * 100) if total_slots > 0 else 0.0
     
     # Công suất hôm nay
-    today_total_slots = db.query(TimeSlot).filter(TimeSlot.date == today).count()
-    today_booked_slots = db.query(TimeSlot).filter(TimeSlot.date == today, TimeSlot.status == "booked").count()
+    today_total_slots = db.query(TimeSlot).filter(TimeSlot.date == today_vn).count()
+    today_booked_slots = db.query(TimeSlot).filter(TimeSlot.date == today_vn, TimeSlot.status == "booked").count()
     today_occupancy_rate = (today_booked_slots / today_total_slots * 100) if today_total_slots > 0 else 0.0
     
     # Tình trạng sân
     total_courts = db.query(Court).count()
     active_courts = db.query(Court).filter(Court.status == "active").count()
     
-    # Phân quyền: Nhân viên (staff) không xem số liệu doanh thu & quỹ cọc của chủ sân
+    # Phân quyền: Nhân viên (staff) không xem số liệu tổng tích lũy toàn sân & quỹ cọc lớn của chủ sân, nhưng xem doanh thu trong ca/ngày hôm nay
     if current_user.role != "admin":
         total_revenue = 0.0
         total_deposit_query = 0.0
         deposit_from_active = 0.0
         deposit_from_cancelled = 0.0
-        today_revenue = 0.0
+        # today_revenue giữ nguyên để phục vụ hiển thị KPI doanh thu trong ngày tại quầy tiếp tân
     
     return OverviewResponse(
         total_revenue=float(str(total_revenue)),
@@ -112,7 +128,7 @@ def get_revenue_chart(
     to_date: Optional[date] = None, 
     all_time: Optional[bool] = False,
     db: Session = Depends(get_db), 
-    current_user = Depends(require_admin)
+    current_user = Depends(get_current_user)
 ):
     min_pay_date = db.query(func.min(Payment.paid_at)).scalar()
     min_book_date = db.query(func.min(Booking.created_at)).scalar()
@@ -151,9 +167,14 @@ def get_revenue_chart(
             bookings = db.query(Booking).filter(Booking.deposit_amount > 0).all()
             for b in bookings:
                 if b.created_at and b.created_at.date() == s_date:
-                    h_str = f"{b.created_at.hour:02d}:00"
-                    if h_str in hour_dict:
-                        hour_dict[h_str] += float(b.deposit_amount or 0.0)
+                    has_paid_p = db.query(Payment).filter(
+                        Payment.booking_id == b.id,
+                        Payment.status == "paid"
+                    ).first()
+                    if not has_paid_p:
+                        h_str = f"{b.created_at.hour:02d}:00"
+                        if h_str in hour_dict:
+                            hour_dict[h_str] += float(b.deposit_amount or 0.0)
 
             for k in hour_dict:
                 hour_dict[k] = max(0.0, hour_dict[k])
@@ -184,9 +205,14 @@ def get_revenue_chart(
         for b in bookings:
             b_date = b.created_at.date() if b.created_at else None
             if b_date and s_date <= b_date <= e_date:
-                iso_key = b_date.isoformat()
-                if iso_key in rev_dict:
-                    rev_dict[iso_key] += float(b.deposit_amount or 0.0)  # type: ignore
+                has_paid_p = db.query(Payment).filter(
+                    Payment.booking_id == b.id,
+                    Payment.status == "paid"
+                ).first()
+                if not has_paid_p:
+                    iso_key = b_date.isoformat()
+                    if iso_key in rev_dict:
+                        rev_dict[iso_key] += float(b.deposit_amount or 0.0)  # type: ignore
 
         for k in rev_dict:
             rev_dict[k] = max(0.0, rev_dict[k])
@@ -252,14 +278,7 @@ def get_court_occupancy(
     if from_date and to_date and from_date > to_date:
         raise HTTPException(status_code=400, detail="from_date must be less than or equal to to_date")
     
-    use_all_slots = False
-    if not all_time and from_date and to_date:
-        range_booked = db.query(TimeSlot).filter(TimeSlot.date >= from_date, TimeSlot.date <= to_date, TimeSlot.status == "booked").count()
-        total_booked = db.query(TimeSlot).filter(TimeSlot.status == "booked").count()
-        if range_booked == 0 and total_booked > 0:
-            use_all_slots = True
-    else:
-        use_all_slots = True
+    use_all_slots = all_time or (from_date is None and to_date is None)
 
     courts = db.query(Court).all()
     result = []

@@ -46,8 +46,14 @@ def generate(system_prompt: str, user_prompt: str, timeout: float = 12.0, contex
         )
 
     # Danh sách model ứng viên (ưu tiên model trong settings, dự phòng các model tương thích)
-    candidate_models = [settings.GEMINI_MODEL]
-    for backup_model in ["gemini-3.6-flash", "gemini-3.5-flash"]:
+    candidate_models = [settings.GEMINI_MODEL] if settings.GEMINI_MODEL else []
+    for backup_model in [
+        "gemini-flash-lite-latest",
+        "gemini-3.1-flash-lite-preview",
+        "gemini-3-flash-preview",
+        "gemini-3.6-flash",
+        "gemini-3.5-flash"
+    ]:
         if backup_model not in candidate_models:
             candidate_models.append(backup_model)
 

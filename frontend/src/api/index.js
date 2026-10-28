@@ -76,6 +76,7 @@ export const aiAPI = {
   suggestSlot: (data) => api.post('/ai/suggest-slot', data).then(r => r.data),
   generateMessage: (bookingId) => api.post(`/ai/generate-message/${bookingId}`).then(r => r.data),
   occupancySummary: (params) => api.get('/ai/occupancy-summary', { params }).then(r => r.data),
+  financialInsights: (params) => api.get('/ai/financial-insights', { params }).then(r => r.data),
 };
 
 export const usersAPI = {

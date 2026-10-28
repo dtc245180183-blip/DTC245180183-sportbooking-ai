@@ -48,10 +48,11 @@ sport_booking.db
 *.swp
 *.swo
 
-# OS Generated Files
+# OS Generated Files & Scratch
 Thumbs.db
 Desktop.ini
 .DS_Store
+scratch/
 
 # ==============================================================================
 # Whitelist Sample Production Database (Required for Docker Evaluation)

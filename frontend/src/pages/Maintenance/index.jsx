@@ -1,13 +1,15 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { maintenanceAPI, courtsAPI, courtTypesAPI } from '../../api';
 import {
   Wrench, Plus, Edit, Trash2, AlertTriangle, CheckCircle, Clock,
   Search, Filter, Calendar, LayoutList, Columns, ChevronRight,
-  ShieldCheck, AlertCircle, ArrowRight, RefreshCw, Sparkles
+  ShieldCheck, AlertCircle, ArrowRight, RefreshCw, Sparkles, X
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../components/ui/Toast';
 import { Button, Card, Badge, Modal, Input, Select, ConfirmModal, Skeleton } from '../../components/ui';
+import { todayVN } from '../../utils/datetime';
 import './Maintenance.css';
 
 /* ── Status definitions ───────────────────────────── */
@@ -109,12 +111,18 @@ export default function Maintenance() {
   const { user } = useAuth();
   const { showToast } = useToast();
   const isAdmin = user?.role === 'admin';
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // Data states
   const [schedules, setSchedules] = useState([]);
   const [courts, setCourts] = useState([]);
   const [courtTypes, setCourtTypes] = useState([]);
   const [loading, setLoading] = useState(false);
+
+  // Targeted schedule & court from notification navigation
+  const targetCourtId = searchParams.get('court_id');
+  const targetScheduleId = searchParams.get('schedule_id');
+  const [highlightScheduleId, setHighlightScheduleId] = useState(null);
 
   // View state: 'table' or 'kanban'
   const [viewMode, setViewMode] = useState('table');
@@ -124,16 +132,27 @@ export default function Maintenance() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [courtFilter, setCourtFilter] = useState('all');
 
+  // Đọc params khi chuyển từ chuông thông báo sang
+  useEffect(() => {
+    if (targetCourtId) {
+      setCourtFilter(String(targetCourtId));
+    }
+    if (targetScheduleId) {
+      setHighlightScheduleId(String(targetScheduleId));
+      setStatusFilter('all'); // Không bị lọc mất bởi tab
+    }
+  }, [targetCourtId, targetScheduleId]);
+
   // Modal: Form Create / Edit
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState(null);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState(() => ({
     court_id: '',
-    start_date: new Date().toISOString().slice(0, 10),
-    end_date: new Date().toISOString().slice(0, 10),
+    start_date: todayVN(),
+    end_date: todayVN(),
     reason: '',
     status: 'planned',
-  });
+  }));
   const [conflicts, setConflicts] = useState(null);
   const [saving, setSaving] = useState(false);
 
@@ -189,6 +208,25 @@ export default function Maintenance() {
     };
   }, [schedules, courts]);
 
+  // Targeted schedule object
+  const highlightSchedule = useMemo(() => {
+    if (!highlightScheduleId) return null;
+    return schedules.find(s => String(s.id) === String(highlightScheduleId)) || null;
+  }, [highlightScheduleId, schedules]);
+
+  // Tự động cuộn đến hàng lịch bảo trì đang cần thao tác
+  useEffect(() => {
+    if (highlightScheduleId && schedules.length > 0) {
+      const timer = setTimeout(() => {
+        const el = document.getElementById(`maint-row-${highlightScheduleId}`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 350);
+      return () => clearTimeout(timer);
+    }
+  }, [highlightScheduleId, schedules, viewMode]);
+
   // 3. Filtered Schedules
   const filteredSchedules = useMemo(() => {
     return schedules.filter(s => {
@@ -218,8 +256,8 @@ export default function Maintenance() {
     setEditId(null);
     setFormData({
       court_id: courts[0]?.id ? String(courts[0].id) : '',
-      start_date: new Date().toISOString().slice(0, 10),
-      end_date: new Date().toISOString().slice(0, 10),
+      start_date: todayVN(),
+      end_date: todayVN(),
       reason: '',
       status: 'planned',
     });
@@ -440,6 +478,63 @@ export default function Maintenance() {
         </div>
       </div>
 
+      {/* ── Targeted Action Callout Banner (Khi Admin bấm từ thông báo sang) ── */}
+      {highlightSchedule && (
+        <div className="maint-action-callout-banner">
+          <div className="maint-callout-left">
+            <div className="maint-callout-icon">
+              <Wrench size={22} />
+            </div>
+            <div className="maint-callout-text">
+              <h4>
+                {highlightSchedule.status === 'planned'
+                  ? '⚡ Yêu cầu kích hoạt bảo trì sân:'
+                  : highlightSchedule.status === 'in_progress'
+                  ? '🔧 Sân đang thi công bảo trì:'
+                  : '✅ Lịch bảo trì sân:'} {getCourtName(highlightSchedule.court_id)}
+              </h4>
+              <p>
+                Lịch #{highlightSchedule.id} • Thời gian: <strong>{formatDateVN(highlightSchedule.start_date)}</strong> ➔ <strong>{formatDateVN(highlightSchedule.end_date)}</strong> • Lý do: <em>{highlightSchedule.reason || 'Bảo dưỡng định kỳ'}</em>.
+                {highlightSchedule.status === 'planned' && ' Bấm nút bên phải để kích hoạt "Đang sửa" và tự động khóa ca sân đón khách.'}
+                {highlightSchedule.status === 'in_progress' && ' Khi thi công xong, bấm nút "Nghiệm thu & Mở sân" để mở lại đón khách.'}
+              </p>
+            </div>
+          </div>
+          <div className="maint-callout-actions">
+            {isAdmin && highlightSchedule.status === 'planned' && (
+              <Button
+                variant="primary"
+                icon={<Wrench size={15} />}
+                onClick={() => handleStatusUpdate(highlightSchedule.id, 'in_progress')}
+                style={{ background: '#D97706', borderColor: '#D97706', fontWeight: 700, boxShadow: '0 2px 8px rgba(217, 119, 6, 0.3)' }}
+              >
+                Bắt đầu bảo trì ngay
+              </Button>
+            )}
+            {isAdmin && highlightSchedule.status === 'in_progress' && (
+              <Button
+                variant="primary"
+                icon={<CheckCircle size={15} />}
+                onClick={() => handleStatusUpdate(highlightSchedule.id, 'done')}
+                style={{ background: '#059669', borderColor: '#059669', fontWeight: 700 }}
+              >
+                Nghiệm thu & Mở sân
+              </Button>
+            )}
+            <button
+              className="maint-callout-close"
+              onClick={() => {
+                setHighlightScheduleId(null);
+                setSearchParams({});
+              }}
+              title="Đóng chỉ dẫn này"
+            >
+              <X size={18} />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ── 3. Search & Filter Toolbar ──────────────────── */}
       <div className="maint-toolbar-card">
         {/* Status Filter Tabs */}
@@ -560,9 +655,10 @@ export default function Maintenance() {
                 const days = calculateDays(row.start_date, row.end_date);
                 const meta = STATUS_META[row.status] || STATUS_META.planned;
                 const StatusIcon = meta.icon;
+                const isTarget = String(row.id) === String(highlightScheduleId);
 
                 return (
-                  <tr key={row.id}>
+                  <tr key={row.id} id={`maint-row-${row.id}`} className={isTarget ? 'highlight-action-row' : ''}>
                     {/* ID */}
                     <td style={{ fontWeight: 700, color: '#64748B' }}>
                       #{row.id}
@@ -575,7 +671,12 @@ export default function Maintenance() {
                           {sport.icon}
                         </div>
                         <div>
-                          <p className="maint-court-name">{court.name || `Sân #${row.court_id}`}</p>
+                          <p className="maint-court-name">
+                            {court.name || `Sân #${row.court_id}`}
+                            {isTarget && (
+                              <span className="maint-target-tag">📍 Đang chọn</span>
+                            )}
+                          </p>
                           <p className="maint-court-type">{sport.sport} • {typeName || 'Tiêu chuẩn'}</p>
                         </div>
                       </div>

@@ -71,3 +71,23 @@ def build_reminder_user_prompt(customer_name, court_name, book_date, start_time,
 
 def build_occupancy_summary_user_prompt(from_date, to_date, raw_data):
     return f"Dữ liệu tỉ lệ lấp đầy theo khung giờ từ {from_date} đến {to_date}:\n{json.dumps(raw_data, ensure_ascii=False)}.\nHãy tóm tắt khung giờ cao điểm/thấp điểm và đề xuất 1-2 chương trình khuyến mại cho khung giờ thấp điểm."
+
+FINANCIAL_INSIGHTS_SYSTEM = (
+    "Bạn là Giám đốc Tài chính kiêm Chuyên gia tư vấn chiến lược kinh doanh sân thể thao cao cấp. "
+    "Nhiệm vụ của bạn là phân tích sâu số liệu tài chính thực tế (dòng tiền thực thu, doanh thu ròng, tỷ lệ hủy/hoàn tiền, "
+    "doanh thu theo môn thể thao & từng sân, giá trị trung bình đơn AOV) từ hệ thống. "
+    "Báo cáo phải súc tích, mang tính thực tiễn cao, có dẫn chứng số liệu VNĐ cụ thể và trình bày theo đúng 4 đề mục rõ ràng:\n"
+    "1. 💰 TỔNG QUAN DÒNG TIỀN & DOANH THU\n"
+    "2. 🏆 HIỆU QUẢ KINH TẾ THEO MÔN & TỪNG SÂN\n"
+    "3. 📈 ĐÁNH GIÁ XU HƯỚNG & CẢNH BÁO RỦI RO\n"
+    "4. 🎯 CHIẾN LƯỢC TỐI ĐA HÓA DOANH THU & ĐỀ XUẤT GIÁ\n\n"
+    "QUY TẮC TIỀN TỆ: Bắt buộc viết chuẩn định dạng VNĐ có dấu chấm phân cách hàng nghìn và kèm chữ 'đ' hoặc 'VNĐ' (ví dụ: 1.250.000đ)."
+)
+
+def build_financial_insights_user_prompt(from_date, to_date, financial_data):
+    return (
+        f"Dữ liệu tài chính sân thể thao từ ngày {from_date} đến ngày {to_date}:\n"
+        f"{json.dumps(financial_data, ensure_ascii=False, indent=2)}\n\n"
+        f"Hãy phân tích toàn diện tình hình tài chính của tổ hợp thể thao theo đúng 4 đề mục được yêu cầu. "
+        f"Đưa ra 2-3 giải pháp chiến lược giá hoặc đóng gói dịch vụ cụ thể giúp gia tăng doanh thu từ 15-25%."
+    )

@@ -13,7 +13,8 @@ import {
   Calendar,
   AlertTriangle,
   ArrowRight,
-  Flame
+  Flame,
+  BellRing
 } from 'lucide-react';
 import { bookingsAPI, maintenanceAPI, courtsAPI } from '../api';
 import { useAuth } from '../contexts/AuthContext';
@@ -75,6 +76,13 @@ export default function NotificationPopover({ isOpen, onClose, onCountChange }) 
     const allIds = notifications.map((n) => n.id);
     setReadIds(allIds);
     localStorage.setItem(storageKey, JSON.stringify(allIds));
+    showToast({ type: 'success', message: 'Đã đánh dấu tất cả thông báo là đã đọc (Tắt chuông đỏ)' });
+  };
+
+  const markAllAsUnread = () => {
+    setReadIds([]);
+    localStorage.removeItem(storageKey);
+    showToast({ type: 'success', message: 'Đã đặt lại: Toàn bộ thông báo đã chuyển thành chưa đọc (Hiện lại số đỏ trên chuông)!' });
   };
 
   // Tải dữ liệu từ APIs
@@ -91,6 +99,32 @@ export default function NotificationPopover({ isOpen, onClose, onCountChange }) 
       setRawCourts(Array.isArray(cData) ? cData : []);
     } catch (err) {
       console.error('Lỗi tải dữ liệu thông báo:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Làm mới thủ công có phản hồi Toast và hiệu ứng xoay mượt mà
+  const handleManualRefresh = async (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    setLoading(true);
+    try {
+      const [bData, mData, cData] = await Promise.all([
+        bookingsAPI.getAll().catch(() => []),
+        maintenanceAPI.getAll().catch(() => []),
+        courtsAPI.getAll().catch(() => [])
+      ]);
+      setRawBookings(Array.isArray(bData) ? bData : []);
+      setRawMaintenance(Array.isArray(mData) ? mData : []);
+      setRawCourts(Array.isArray(cData) ? cData : []);
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      showToast({ type: 'success', message: 'Đã làm mới dữ liệu thông báo thành công!' });
+    } catch (err) {
+      console.error('Lỗi làm mới thông báo:', err);
+      showToast({ type: 'error', message: 'Không thể làm mới dữ liệu thông báo' });
     } finally {
       setLoading(false);
     }
@@ -163,16 +197,31 @@ export default function NotificationPopover({ isOpen, onClose, onCountChange }) 
 
       // 1.1 Đang ở trạng thái KẾ HOẠCH (planned):
       if (mItem.status === 'planned') {
+        const isStartToday = mItem.start_date === todayStr;
+        const isOverdueStart = mItem.start_date < todayStr;
+        const isStartTomorrow = mItem.start_date === tomorrowStr;
+
+        const basePlanData = {
+          courtId: mItem.court_id,
+          scheduleId: mItem.id,
+          courtName,
+          startDate: mItem.start_date,
+          endDate: mItem.end_date,
+          reason: mItem.reason || 'Bảo dưỡng định kỳ',
+          isDueOrOverdue: isStartToday || isOverdueStart,
+          currentStatus: 'planned'
+        };
+
         // A) Bắt đầu hôm nay
-        if (mItem.start_date === todayStr) {
+        if (isStartToday) {
           list.push({
             id: `maint-start-today-${mItem.id}`,
             type: 'maint_start',
             title: `⚡ ${courtName} bắt đầu bảo trì hôm nay`,
-            desc: `Kế hoạch thi công (${formatDateVN(mItem.start_date)} đến ${formatDateVN(mItem.end_date)}): ${mItem.reason || 'Bảo dưỡng định kỳ'}. ${isAdmin ? 'Bấm nút bên dưới để chuyển sang "Đang sửa" và khóa sân.' : 'Lễ tân lưu ý không nhận lịch đặt sân!'}`,
+            desc: `Kế hoạch thi công (${formatDateVN(mItem.start_date)} đến ${formatDateVN(mItem.end_date)}): ${mItem.reason || 'Bảo dưỡng định kỳ'}. ${isAdmin ? 'Bấm nút để kích hoạt "Đang sửa" và tự động khóa ca sân.' : 'Lễ tân lưu ý không nhận lịch đặt sân!'}`,
             timeBadge: 'Bắt đầu hôm nay',
             severity: 'warning',
-            link: '/maintenance',
+            link: `/maintenance?court_id=${mItem.court_id}&schedule_id=${mItem.id}`,
             createdAt: mItem.start_date,
             action: isAdmin ? {
               label: 'Chuyển sang Đang bảo trì',
@@ -182,17 +231,14 @@ export default function NotificationPopover({ isOpen, onClose, onCountChange }) 
               courtName,
               variant: 'warning'
             } : null,
-            planData: !isAdmin ? {
-              courtName,
-              startDate: mItem.start_date,
-              endDate: mItem.end_date,
-              reason: mItem.reason || 'Bảo dưỡng định kỳ',
-              status: 'Kế hoạch bảo trì'
-            } : null
+            planData: {
+              ...basePlanData,
+              status: 'Bắt đầu hôm nay'
+            }
           });
         }
         // B) Quá hạn ngày bắt đầu mà chưa kích hoạt
-        else if (mItem.start_date < todayStr) {
+        else if (isOverdueStart) {
           list.push({
             id: `maint-start-overdue-${mItem.id}`,
             type: 'maint_overdue_start',
@@ -200,7 +246,7 @@ export default function NotificationPopover({ isOpen, onClose, onCountChange }) 
             desc: `Lịch dự kiến bắt đầu từ ${formatDateVN(mItem.start_date)} nhưng chưa được kích hoạt thi công. ${isAdmin ? 'Vui lòng bấm kích hoạt thi công ngay hoặc dời ngày.' : 'Lễ tân chú ý kiểm tra tình trạng sân.'}`,
             timeBadge: 'Quá hạn bắt đầu',
             severity: 'danger',
-            link: '/maintenance',
+            link: `/maintenance?court_id=${mItem.court_id}&schedule_id=${mItem.id}`,
             createdAt: mItem.start_date,
             action: isAdmin ? {
               label: 'Bắt đầu bảo trì ngay',
@@ -209,11 +255,15 @@ export default function NotificationPopover({ isOpen, onClose, onCountChange }) 
               scheduleId: mItem.id,
               courtName,
               variant: 'warning'
-            } : null
+            } : null,
+            planData: {
+              ...basePlanData,
+              status: 'Quá hạn bắt đầu'
+            }
           });
         }
         // C) Bắt đầu ngày mai
-        else if (mItem.start_date === tomorrowStr) {
+        else if (isStartTomorrow) {
           list.push({
             id: `maint-tomorrow-${mItem.id}`,
             type: 'maint_tomorrow',
@@ -221,13 +271,10 @@ export default function NotificationPopover({ isOpen, onClose, onCountChange }) 
             desc: `Dự kiến bảo trì từ ngày mai (${formatDateVN(mItem.start_date)}) đến ${formatDateVN(mItem.end_date)}: ${mItem.reason || 'Bảo dưỡng định kỳ'}. Chuẩn bị kỹ thuật & ngừng nhận khách.`,
             timeBadge: 'Ngày mai',
             severity: 'info',
-            link: '/maintenance',
+            link: `/maintenance?court_id=${mItem.court_id}&schedule_id=${mItem.id}`,
             createdAt: mItem.start_date,
             planData: {
-              courtName,
-              startDate: mItem.start_date,
-              endDate: mItem.end_date,
-              reason: mItem.reason || 'Bảo dưỡng định kỳ',
+              ...basePlanData,
               status: 'Kế hoạch ngày mai'
             }
           });
@@ -241,13 +288,10 @@ export default function NotificationPopover({ isOpen, onClose, onCountChange }) 
             desc: `Dự kiến bảo dưỡng từ ${formatDateVN(mItem.start_date)} đến ${formatDateVN(mItem.end_date)}: ${mItem.reason || 'Bảo dưỡng định kỳ'}.`,
             timeBadge: `Từ ${formatDateVN(mItem.start_date)}`,
             severity: 'info',
-            link: '/maintenance',
+            link: `/maintenance?court_id=${mItem.court_id}&schedule_id=${mItem.id}`,
             createdAt: mItem.start_date,
             planData: {
-              courtName,
-              startDate: mItem.start_date,
-              endDate: mItem.end_date,
-              reason: mItem.reason || 'Bảo dưỡng định kỳ',
+              ...basePlanData,
               status: 'Kế hoạch tương lai'
             }
           });
@@ -256,6 +300,17 @@ export default function NotificationPopover({ isOpen, onClose, onCountChange }) 
 
       // 1.2 Đang ở trạng thái THI CÔNG (in_progress):
       else if (mItem.status === 'in_progress') {
+        const basePlanData = {
+          courtId: mItem.court_id,
+          scheduleId: mItem.id,
+          courtName,
+          startDate: mItem.start_date,
+          endDate: mItem.end_date,
+          reason: mItem.reason || 'Bảo dưỡng định kỳ',
+          isDueOrOverdue: mItem.end_date <= todayStr,
+          currentStatus: 'in_progress'
+        };
+
         // A) Đến hạn kết thúc hôm nay
         if (mItem.end_date === todayStr) {
           list.push({
@@ -265,7 +320,7 @@ export default function NotificationPopover({ isOpen, onClose, onCountChange }) 
             desc: `Lịch bảo trì (${formatDateVN(mItem.start_date)} đến ${formatDateVN(mItem.end_date)}) đã đến hạn xong. ${isAdmin ? 'Vui lòng nghiệm thu và bấm nút để mở lại sân đón khách.' : 'Chờ quản lý nghiệm thu mở lại sân.'}`,
             timeBadge: 'Đến hạn xong',
             severity: 'warning',
-            link: '/maintenance',
+            link: `/maintenance?court_id=${mItem.court_id}&schedule_id=${mItem.id}`,
             createdAt: mItem.end_date,
             action: isAdmin ? {
               label: 'Nghiệm thu & Mở sân',
@@ -274,7 +329,11 @@ export default function NotificationPopover({ isOpen, onClose, onCountChange }) 
               scheduleId: mItem.id,
               courtName,
               variant: 'success'
-            } : null
+            } : null,
+            planData: {
+              ...basePlanData,
+              status: 'Đến hạn nghiệm thu hôm nay'
+            }
           });
         }
         // B) ĐÃ QUÁ HẠN KẾT THÚC (end_date < todayStr)
@@ -286,7 +345,7 @@ export default function NotificationPopover({ isOpen, onClose, onCountChange }) 
             desc: `Lịch bảo dưỡng dự kiến xong ngày ${formatDateVN(mItem.end_date)}. Sân vẫn đang bị khóa thi công. ${isAdmin ? 'Bấm nút để hoàn tất nghiệm thu và mở lại sân ngay!' : 'Sân đang quá hạn thi công.'}`,
             timeBadge: 'Quá hạn mở sân',
             severity: 'danger',
-            link: '/maintenance',
+            link: `/maintenance?court_id=${mItem.court_id}&schedule_id=${mItem.id}`,
             createdAt: mItem.end_date,
             action: isAdmin ? {
               label: 'Nghiệm thu & Mở sân ngay',
@@ -295,7 +354,11 @@ export default function NotificationPopover({ isOpen, onClose, onCountChange }) 
               scheduleId: mItem.id,
               courtName,
               variant: 'success'
-            } : null
+            } : null,
+            planData: {
+              ...basePlanData,
+              status: 'Quá hạn nghiệm thu'
+            }
           });
         }
         // C) Đang thi công bình thường (end_date > todayStr)
@@ -307,13 +370,10 @@ export default function NotificationPopover({ isOpen, onClose, onCountChange }) 
             desc: `Đang sửa từ ${formatDateVN(mItem.start_date)} đến ${formatDateVN(mItem.end_date)}: ${mItem.reason || 'Bảo dưỡng định kỳ'}. Sân đang tạm khóa.`,
             timeBadge: 'Đang bảo trì',
             severity: 'info',
-            link: '/maintenance',
+            link: `/maintenance?court_id=${mItem.court_id}&schedule_id=${mItem.id}`,
             createdAt: mItem.start_date,
             planData: {
-              courtName,
-              startDate: mItem.start_date,
-              endDate: mItem.end_date,
-              reason: mItem.reason || 'Bảo dưỡng định kỳ',
+              ...basePlanData,
               status: 'Đang bảo dưỡng'
             }
           });
@@ -329,7 +389,7 @@ export default function NotificationPopover({ isOpen, onClose, onCountChange }) 
           desc: `Lịch bảo dưỡng (kết thúc ${formatDateVN(mItem.end_date)}) đã nghiệm thu hoàn tất. Sân sẵn sàng tiếp nhận khách đặt!`,
           timeBadge: 'Đã xong',
           severity: 'success',
-          link: '/schedule',
+          link: `/maintenance?court_id=${mItem.court_id}&schedule_id=${mItem.id}`,
           createdAt: mItem.end_date
         });
       }
@@ -439,7 +499,7 @@ export default function NotificationPopover({ isOpen, onClose, onCountChange }) 
         }
 
         const paidPayments = b.payments?.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0) || 0;
-        const totalPaid = paidPayments + (b.deposit_amount || 0);
+        const totalPaid = paidPayments > 0 ? paidPayments : (b.deposit_amount || 0);
         const remainingAmount = Math.max(0, (b.total_amount || 0) - totalPaid);
 
         if (b.status === 'confirmed' && isEnded && remainingAmount > 0) {
@@ -491,6 +551,15 @@ export default function NotificationPopover({ isOpen, onClose, onCountChange }) 
     navigate(`/schedule?date=${plan.startDate}`);
   };
 
+  const handleGoToMaintenanceCourt = (plan) => {
+    onClose();
+    setSelectedPlanModal(null);
+    const query = new URLSearchParams();
+    if (plan.courtId) query.set('court_id', String(plan.courtId));
+    if (plan.scheduleId) query.set('schedule_id', String(plan.scheduleId));
+    navigate(`/maintenance?${query.toString()}`);
+  };
+
   if (!isOpen && !selectedPlanModal) return null;
 
   return (
@@ -519,23 +588,35 @@ export default function NotificationPopover({ isOpen, onClose, onCountChange }) 
               </div>
               <div className="notif-header-actions">
                 <button 
+                  type="button"
                   className="notif-tool-btn" 
-                  onClick={fetchNotificationData} 
+                  onClick={handleManualRefresh} 
                   title="Làm mới dữ liệu"
                   disabled={loading}
                 >
                   <RotateCw size={14} className={loading ? 'spin' : ''} />
                 </button>
-                {unreadCount > 0 && (
+                {unreadCount > 0 ? (
                   <button 
+                    type="button"
                     className="notif-tool-btn" 
                     onClick={markAllAsRead} 
-                    title="Đánh dấu tất cả đã đọc"
+                    title="Đánh dấu tất cả đã đọc (Tắt chuông đỏ)"
                   >
                     <CheckCheck size={15} />
                   </button>
+                ) : (
+                  <button 
+                    type="button"
+                    className="notif-tool-btn" 
+                    onClick={markAllAsUnread} 
+                    title="Đánh dấu chưa đọc (Hiện lại số đỏ trên chuông)"
+                    style={{ color: '#E11D48' }}
+                  >
+                    <BellRing size={14} />
+                  </button>
                 )}
-                <button className="notif-tool-btn" onClick={onClose} title="Đóng">
+                <button type="button" className="notif-tool-btn" onClick={onClose} title="Đóng">
                   <X size={15} />
                 </button>
               </div>
@@ -567,11 +648,34 @@ export default function NotificationPopover({ isOpen, onClose, onCountChange }) 
                   <p className="notif-empty-title">Không có thông báo nào</p>
                   <p className="notif-empty-desc">
                     {activeTab === 'unread' 
-                      ? 'Bạn đã đọc tất cả thông báo.' 
+                      ? 'Bạn đã đọc tất cả thông báo. Quả chuông trên thanh tiêu đề đã tắt chấm đỏ.' 
                       : (isAdmin 
                           ? 'Hiện không có lịch bảo trì nào đến hạn cần duyệt.' 
                           : 'Mọi hoạt động sân và lịch đặt đều đang được xử lý tốt!')}
                   </p>
+                  {activeTab === 'unread' && notifications.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={markAllAsUnread}
+                      style={{
+                        marginTop: '0.85rem',
+                        padding: '0.45rem 0.95rem',
+                        fontSize: '0.78rem',
+                        fontWeight: 600,
+                        color: '#E11D48',
+                        background: '#FFF1F2',
+                        border: '1px solid #FECDD3',
+                        borderRadius: 8,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6
+                      }}
+                    >
+                      <BellRing size={14} />
+                      Đánh dấu chưa đọc (Bật lại chuông đỏ)
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div className="notif-list">
@@ -614,7 +718,7 @@ export default function NotificationPopover({ isOpen, onClose, onCountChange }) 
                             </div>
                           )}
 
-                          {/* Nút Xem chi tiết kế hoạch dành cho Lễ tân */}
+                          {/* Nút Xem chi tiết kế hoạch */}
                           {item.planData && (
                             <div className="notif-item-actions">
                               <button
@@ -627,7 +731,7 @@ export default function NotificationPopover({ isOpen, onClose, onCountChange }) 
                                 }}
                               >
                                 <Calendar size={13} />
-                                Xem chi tiết kế hoạch ngày
+                                {isAdmin ? 'Xem kế hoạch & chỉ đạo' : 'Xem chi tiết kế hoạch ngày'}
                               </button>
                             </div>
                           )}
@@ -644,7 +748,7 @@ export default function NotificationPopover({ isOpen, onClose, onCountChange }) 
         </div>
       )}
 
-      {/* Modal Chi tiết Kế hoạch Bảo trì cho Lễ tân */}
+      {/* Modal Chi tiết Kế hoạch Bảo trì: Phân quyền Admin & Lễ tân */}
       {selectedPlanModal && (
         <div className="maint-plan-modal-overlay" onClick={() => setSelectedPlanModal(null)}>
           <div className="maint-plan-modal-card" onClick={(e) => e.stopPropagation()}>
@@ -662,7 +766,7 @@ export default function NotificationPopover({ isOpen, onClose, onCountChange }) 
                     Kế hoạch Bảo trì Sân
                   </h3>
                   <span style={{ fontSize: '0.75rem', color: '#64748B' }}>
-                    Thông tin hiển thị cho Lễ tân điều phối sân
+                    {isAdmin ? 'Thông tin quản trị & chỉ đạo kỹ thuật bảo dưỡng' : 'Thông tin hiển thị cho Lễ tân điều phối sân'}
                   </span>
                 </div>
               </div>
@@ -703,15 +807,28 @@ export default function NotificationPopover({ isOpen, onClose, onCountChange }) 
                 </div>
               </div>
 
-              <div className="maint-plan-alert">
-                <AlertTriangle size={18} style={{ flexShrink: 0, marginTop: 1, color: '#DC2626' }} />
-                <div>
-                  <strong>Lưu ý nghiệp vụ lễ tân:</strong>
-                  <div style={{ marginTop: 2 }}>
-                    Trong khoảng thời gian từ ngày <strong>{formatDateVN(selectedPlanModal.startDate)}</strong> đến <strong>{formatDateVN(selectedPlanModal.endDate)}</strong>, sân <strong>{selectedPlanModal.courtName}</strong> sẽ tạm ngưng phục vụ để bảo dưỡng. Vui lòng không nhận lịch đặt sân mới hoặc chuyển khách sang sân khác.
+              {/* Hộp lưu ý theo phân quyền: Admin vs Lễ tân */}
+              {isAdmin ? (
+                <div className="maint-plan-alert admin" style={{ background: '#EFF6FF', borderColor: '#BFDBFE', color: '#1E40AF', borderRadius: 10, padding: '0.75rem 0.85rem', fontSize: '0.78rem', lineHeight: 1.45, display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                  <Wrench size={18} style={{ flexShrink: 0, marginTop: 1, color: '#2563EB' }} />
+                  <div>
+                    <strong style={{ color: '#1E3A8A' }}>Lưu ý Quản trị viên:</strong>
+                    <div style={{ marginTop: 2 }}>
+                      Kế hoạch bảo trì sân <strong>{selectedPlanModal.courtName}</strong> dự kiến thực hiện từ ngày <strong>{formatDateVN(selectedPlanModal.startDate)}</strong> đến <strong>{formatDateVN(selectedPlanModal.endDate)}</strong> ({selectedPlanModal.reason}). Quản trị viên kiểm tra kỹ thuật, vật tư và chuyển trạng thái sân sang <strong>"Đang sửa"</strong> tại trang Quản lý bảo trì để hệ thống tự động khóa sân.
+                    </div>
                   </div>
                 </div>
-              </div>
+              ) : (
+                <div className="maint-plan-alert">
+                  <AlertTriangle size={18} style={{ flexShrink: 0, marginTop: 1, color: '#DC2626' }} />
+                  <div>
+                    <strong>Lưu ý nghiệp vụ lễ tân:</strong>
+                    <div style={{ marginTop: 2 }}>
+                      Trong khoảng thời gian từ ngày <strong>{formatDateVN(selectedPlanModal.startDate)}</strong> đến <strong>{formatDateVN(selectedPlanModal.endDate)}</strong>, sân <strong>{selectedPlanModal.courtName}</strong> sẽ tạm ngưng phục vụ để bảo dưỡng. Vui lòng không nhận lịch đặt sân mới hoặc chuyển khách sang sân khác.
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="maint-plan-modal-footer">
@@ -723,15 +840,32 @@ export default function NotificationPopover({ isOpen, onClose, onCountChange }) 
               >
                 Đóng
               </button>
+
               <button
                 type="button"
-                className="notif-action-btn primary"
-                style={{ padding: '0.45rem 1rem', fontSize: '0.8rem' }}
+                className="notif-tool-btn"
+                style={{ width: 'auto', padding: '0.45rem 0.9rem', fontSize: '0.8rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 5, background: '#F1F5F9', border: '1px solid #CBD5E1' }}
                 onClick={() => handleGoToSchedulePlan(selectedPlanModal)}
               >
+                <Calendar size={14} />
                 <span>Xem lịch ngày {formatDateVN(selectedPlanModal.startDate)}</span>
-                <ArrowRight size={14} />
               </button>
+
+              {/* Nút hành động trực tiếp dành riêng cho Admin chuyển tới sân ở trang Bảo trì */}
+              {isAdmin && selectedPlanModal.courtId && (
+                <button
+                  type="button"
+                  className="notif-action-btn warning"
+                  style={{ padding: '0.45rem 1rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: 6, background: '#D97706', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700, boxShadow: '0 2px 6px rgba(217, 119, 6, 0.25)' }}
+                  onClick={() => handleGoToMaintenanceCourt(selectedPlanModal)}
+                >
+                  <Wrench size={14} />
+                  <span>
+                    {selectedPlanModal.isDueOrOverdue ? '⚡ Đến trang Bảo trì để bấm bắt đầu ngay' : 'Chuyển đến trang Bảo trì sân này'}
+                  </span>
+                  <ArrowRight size={14} />
+                </button>
+              )}
             </div>
           </div>
         </div>

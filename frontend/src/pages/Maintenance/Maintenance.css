@@ -690,3 +690,111 @@
   font-size: 0.84rem;
   margin: 0;
 }
+
+/* ── Targeted Action Callout Banner (when navigating from Notification) ─ */
+.maint-action-callout-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.25rem;
+  background: linear-gradient(135deg, #FEF3C7 0%, #FFFBEB 100%);
+  border: 1.5px solid #F59E0B;
+  border-radius: 14px;
+  padding: 1rem 1.25rem;
+  box-shadow: 0 4px 14px rgba(217, 119, 6, 0.12);
+  animation: maintBannerFadeIn 0.3s ease;
+}
+
+@keyframes maintBannerFadeIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.maint-callout-left {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.maint-callout-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: #F59E0B;
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(217, 119, 6, 0.25);
+}
+
+.maint-callout-text h4 {
+  margin: 0 0 4px;
+  font-size: 0.98rem;
+  font-weight: 800;
+  color: #92400E;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.maint-callout-text p {
+  margin: 0;
+  font-size: 0.84rem;
+  color: #78350F;
+  line-height: 1.45;
+}
+
+.maint-callout-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+.maint-callout-close {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #92400E;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+}
+
+.maint-callout-close:hover {
+  background: rgba(180, 83, 9, 0.12);
+}
+
+/* Highlight Target Row */
+.maint-table tbody tr.highlight-action-row {
+  background: #FFFBEB !important;
+  box-shadow: inset 4px 0 0 #F59E0B;
+  position: relative;
+  animation: maintPulseHighlight 2.5s infinite ease-in-out;
+}
+
+@keyframes maintPulseHighlight {
+  0% { background: #FFFBEB; }
+  50% { background: #FEF3C7; }
+  100% { background: #FFFBEB; }
+}
+
+.maint-target-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #F59E0B;
+  color: #FFFFFF;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 4px;
+  margin-left: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}

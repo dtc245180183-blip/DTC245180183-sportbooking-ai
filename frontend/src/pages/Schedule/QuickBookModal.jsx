@@ -12,15 +12,28 @@ export default function QuickBookModal({ isOpen, onClose, slot, court, onBooking
   const [isNewCustomer, setIsNewCustomer] = useState(false);
   const [newCustomerData, setNewCustomerData] = useState({ full_name: '', phone: '', email: '' });
 
+  // Tính thời lượng thực tế của slot
+  const slotDetails = (() => {
+    if (!slot || !court) return { durationHours: 1, durationLabel: '1 giờ', totalAmount: court?.price_per_hour || 0 };
+    const [startH, startM] = String(slot.start_time).slice(0, 5).split(':').map(Number);
+    const [endH, endM] = String(slot.end_time).slice(0, 5).split(':').map(Number);
+    let diffMins = (endH * 60 + endM) - (startH * 60 + startM);
+    if (diffMins <= 0) diffMins = 60;
+    const durationHours = diffMins / 60;
+    const durationLabel = diffMins === 90 ? '1 tiếng rưỡi (90p)' : (diffMins === 60 ? '1 giờ (60p)' : `${diffMins} phút`);
+    const totalAmount = Math.round((court.price_per_hour || 0) * durationHours);
+    return { durationHours, durationLabel, totalAmount };
+  })();
+
   useEffect(() => {
     if (isOpen) {
       loadCustomers();
       setSelectedCustomerId('');
-      setDepositAmount(court ? court.price_per_hour * 0.5 : ''); // Gợi ý cọc 50%
+      setDepositAmount(slotDetails ? Math.round(slotDetails.totalAmount * 0.5) : ''); // Gợi ý cọc 50% theo thời lượng
       setError('');
       setIsNewCustomer(false);
     }
-  }, [isOpen, court]);
+  }, [isOpen, court, slot]);
 
   const loadCustomers = async () => {
     try {
@@ -104,15 +117,20 @@ export default function QuickBookModal({ isOpen, onClose, slot, court, onBooking
         <form onSubmit={handleSubmit}>
           <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div className="info-box" style={{ background: 'var(--bg-color)', padding: '1rem', borderRadius: 'var(--radius)', border: '1px solid var(--border-color)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                <span style={{ fontWeight: 600 }}>{court.name}</span>
-                <span className="text-gradient" style={{ fontWeight: 600 }}>
-                  {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(court.price_per_hour)}/h
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', alignItems: 'center' }}>
+                <span style={{ fontWeight: 700, fontSize: '1rem' }}>{court.name}</span>
+                <span className="text-gradient" style={{ fontWeight: 800, fontSize: '1.05rem' }}>
+                  {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(slotDetails.totalAmount)}
                 </span>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-                <Calendar size={16} />
-                <span>{slot.date} | {slotTimeStr}</span>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <Calendar size={15} />
+                  <span>{slot.date} | {slotTimeStr}</span>
+                </div>
+                <span style={{ background: '#EFF6FF', color: '#1D4ED8', padding: '2px 8px', borderRadius: 6, fontWeight: 700, fontSize: '0.78rem' }}>
+                  ⏱️ {slotDetails.durationLabel}
+                </span>
               </div>
             </div>
 
